@@ -1,5 +1,5 @@
 import type { ServerStatus } from '../hooks/useServerStatus';
-import { PlusIcon, TrashIcon, VolumeIcon, VolumeOffIcon } from './icons';
+import { HeadsetIcon, PlusIcon, TrashIcon, VolumeIcon, VolumeOffIcon } from './icons';
 
 export type CoreState = ServerStatus | 'processing';
 
@@ -15,6 +15,9 @@ interface HeaderProps {
   voiceReplies: boolean;
   voiceSupported: boolean;
   onToggleVoiceReplies: () => void;
+  handsFree: boolean;
+  handsFreeSupported: boolean;
+  onToggleHandsFree: () => void;
   onNewConversation: () => void;
   onClearConversation: () => void;
   canClear: boolean;
@@ -25,6 +28,9 @@ export function Header({
   voiceReplies,
   voiceSupported,
   onToggleVoiceReplies,
+  handsFree,
+  handsFreeSupported,
+  onToggleHandsFree,
   onNewConversation,
   onClearConversation,
   canClear,
@@ -34,6 +40,11 @@ export function Header({
     : voiceReplies
       ? 'Spoken replies on'
       : 'Spoken replies off';
+  const handsFreeTitle = !handsFreeSupported
+    ? 'Hands-free mode needs Chrome or Edge'
+    : handsFree
+      ? 'End hands-free conversation'
+      : 'Start hands-free conversation';
 
   return (
     <header className="header">
@@ -52,6 +63,17 @@ export function Header({
         <span className={`status status--${coreState}`} role="status">
           {STATUS_LABEL[coreState]}
         </span>
+        <button
+          type="button"
+          className={`btn ${handsFree ? 'btn--live' : 'btn--ghost'}`}
+          onClick={onToggleHandsFree}
+          disabled={!handsFreeSupported}
+          aria-pressed={handsFree}
+          title={handsFreeTitle}
+        >
+          <HeadsetIcon />
+          <span className="btn__label">Hands-free</span>
+        </button>
         <button
           type="button"
           className={`btn btn--ghost${voiceReplies && voiceSupported ? ' is-active' : ''}`}

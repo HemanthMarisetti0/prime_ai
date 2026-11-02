@@ -48,6 +48,8 @@ export function useSpeechSynthesis() {
   const voiceRef = useRef<SpeechSynthesisVoice | undefined>(undefined);
   // Incremented on every speak/stop so callbacks from cancelled utterances are ignored.
   const generationRef = useRef(0);
+  // Chrome can garbage-collect queued utterances and skip their `end` event; keep them referenced.
+  const utterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
 
   useEffect(() => {
     if (!synth) return;
@@ -77,19 +79,21 @@ export function useSpeechSynthesis() {
     const generation = ++generationRef.current;
     synth.cancel();
     const isCurrent = () => generation === generationRef.current;
+    // Mark as speaking immediately (not on audio start) so hands-free mode never opens the mic in between.
+    setIsSpeaking(true);
 
-    chunks.forEach((chunk, index) => {
+    utterancesRef.current = chunks.map((chunk, index) => {
       const utterance = new SpeechSynthesisUtterance(chunk);
       if (voiceRef.current) {
         utterance.voice = voiceRef.current;
         utterance.lang = voiceRef.current.lang;
       }
-      if (index === 0) utterance.onstart = () => isCurrent() && setIsSpeaking(true);
       if (index === chunks.length - 1) {
         utterance.onend = () => isCurrent() && setIsSpeaking(false);
       }
       utterance.onerror = () => isCurrent() && setIsSpeaking(false);
       synth.speak(utterance);
+      return utterance;
     });
   }, []);
 

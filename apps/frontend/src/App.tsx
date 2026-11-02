@@ -3,7 +3,9 @@ import { ChatInput } from './components/ChatInput';
 import { ErrorBanner } from './components/ErrorBanner';
 import { Header } from './components/Header';
 import { MessageList } from './components/MessageList';
+import { HandsFreeBar } from './components/HandsFreeBar';
 import { useChat } from './hooks/useChat';
+import { useHandsFree } from './hooks/useHandsFree';
 import { useServerStatus } from './hooks/useServerStatus';
 import { useSpeechSynthesis } from './hooks/useSpeechSynthesis';
 
@@ -70,6 +72,21 @@ export default function App() {
     newConversation();
   };
 
+  const [handsFree, setHandsFree] = useState(false);
+  const handsFreeSession = useHandsFree({
+    enabled: handsFree,
+    isLoading: chat.isLoading,
+    isSpeaking: speech.isSpeaking,
+    send: handleSend,
+    onDisable: () => setHandsFree(false),
+    onError: setVoiceError,
+  });
+
+  const toggleHandsFree = () => {
+    setVoiceError(null);
+    setHandsFree((on) => !on);
+  };
+
   const errorMessage = chat.error ?? voiceError;
   const handleDismissError = () => {
     dismissError();
@@ -83,6 +100,9 @@ export default function App() {
         voiceReplies={voiceReplies}
         voiceSupported={speech.isSupported}
         onToggleVoiceReplies={toggleVoiceReplies}
+        handsFree={handsFree}
+        handsFreeSupported={handsFreeSession.isSupported}
+        onToggleHandsFree={toggleHandsFree}
         onNewConversation={handleNew}
         onClearConversation={handleClear}
         canClear={chat.messages.length > 1 || chat.isLoading}
@@ -90,6 +110,13 @@ export default function App() {
       <main className="chat">
         <MessageList messages={chat.messages} isLoading={chat.isLoading} />
         {errorMessage && <ErrorBanner message={errorMessage} onDismiss={handleDismissError} />}
+        {handsFreeSession.phase !== 'off' && (
+          <HandsFreeBar
+            phase={handsFreeSession.phase}
+            transcript={handsFreeSession.transcript}
+            onEnd={() => setHandsFree(false)}
+          />
+        )}
         <ChatInput
           key={chat.conversationId}
           onSend={handleSend}
@@ -97,6 +124,7 @@ export default function App() {
           isSpeaking={speech.isSpeaking}
           onStopSpeaking={stopSpeaking}
           onVoiceError={setVoiceError}
+          micDisabled={handsFree}
         />
       </main>
     </div>

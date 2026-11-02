@@ -531,6 +531,102 @@ textarea {
   color: var(--accent);
 }
 
+.btn--live {
+  color: #03111f;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  box-shadow: 0 0 18px -4px var(--accent-glow);
+}
+
+/* ---------- Hands-free bar ---------- */
+.handsfree {
+  --wave-color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 16px 4px;
+  padding: 10px 12px 10px 16px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  animation: message-in 0.2s ease-out both;
+}
+
+.handsfree--listening {
+  --wave-color: var(--danger);
+  border-color: rgb(248 113 113 / 0.5);
+}
+
+.handsfree--speaking {
+  --wave-color: var(--success);
+}
+
+.handsfree--waiting {
+  --wave-color: var(--text-faint);
+}
+
+.handsfree__wave {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.handsfree__wave span {
+  width: 4px;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--wave-color);
+  box-shadow: 0 0 8px var(--wave-color);
+  animation: wave 1s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.handsfree__wave span:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.handsfree__wave span:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+.handsfree__wave span:nth-child(4) {
+  animation-delay: 0.45s;
+}
+
+.handsfree--thinking .handsfree__wave span {
+  animation-duration: 0.6s;
+}
+
+.handsfree--waiting .handsfree__wave span {
+  animation: none;
+  transform: scaleY(0.3);
+}
+
+.handsfree__text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.handsfree__phase {
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--wave-color);
+}
+
+.handsfree__transcript {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ---------- Animations ---------- */
 @keyframes message-in {
   from {
@@ -559,6 +655,16 @@ textarea {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes wave {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
   }
 }
 
@@ -623,6 +729,10 @@ textarea {
 
   .error-banner {
     margin: 0 12px 8px;
+  }
+
+  .handsfree {
+    margin: 0 8px 4px;
   }
 
   .composer {

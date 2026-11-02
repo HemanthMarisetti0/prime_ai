@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { MAX_MESSAGE_LENGTH } from '../hooks/useChat';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { MicIcon, SendIcon, StopIcon } from './icons';
@@ -11,11 +11,13 @@ interface ChatInputProps {
   isSpeaking: boolean;
   onStopSpeaking: () => void;
   onVoiceError: (message: string) => void;
+  /** True while hands-free mode owns the microphone. */
+  micDisabled: boolean;
 }
 
 const joinText = (base: string, addition: string) => (base.trim() ? `${base.trimEnd()} ${addition}` : addition);
 
-export function ChatInput({ onSend, isLoading, isSpeaking, onStopSpeaking, onVoiceError }: ChatInputProps) {
+export function ChatInput({ onSend, isLoading, isSpeaking, onStopSpeaking, onVoiceError, micDisabled }: ChatInputProps) {
   const [draft, setDraft] = useState('');
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const draftBeforeListeningRef = useRef('');
@@ -26,6 +28,12 @@ export function ChatInput({ onSend, isLoading, isSpeaking, onStopSpeaking, onVoi
   });
 
   const canSend = draft.trim().length > 0 && !isLoading;
+
+  // Hand the microphone over if hands-free mode starts mid-dictation.
+  const { isListening, abort: abortDictation } = speech;
+  useEffect(() => {
+    if (micDisabled && isListening) abortDictation();
+  }, [micDisabled, isListening, abortDictation]);
 
   // Grow with content up to a cap, then scroll.
   useLayoutEffect(() => {
@@ -70,7 +78,9 @@ export function ChatInput({ onSend, isLoading, isSpeaking, onStopSpeaking, onVoi
 
   const micTitle = !speech.isSupported
     ? 'Voice input is not supported in this browser. Use Chrome or Edge.'
-    : speech.isListening
+    : micDisabled
+      ? 'Hands-free mode is using the microphone'
+      : speech.isListening
       ? 'Stop listening'
       : 'Speak your message';
 
@@ -105,7 +115,7 @@ export function ChatInput({ onSend, isLoading, isSpeaking, onStopSpeaking, onVoi
           type="button"
           className={`icon-btn icon-btn--mic${speech.isListening ? ' is-listening' : ''}`}
           onClick={toggleListening}
-          disabled={!speech.isSupported}
+          disabled={!speech.isSupported || micDisabled}
           aria-label={micTitle}
           aria-pressed={speech.isListening}
           title={micTitle}

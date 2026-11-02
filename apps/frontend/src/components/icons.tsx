@@ -37,6 +37,13 @@ export const MicIcon = () => (
   </Icon>
 );
 
+export const HeadsetIcon = () => (
+  <Icon>
+    <path d="M3 14v-2a9 9 0 0 1 18 0v2" />
+    <path d="M21 15a2 2 0 0 1-2 2h-1v-6h1a2 2 0 0 1 2 2zM3 15a2 2 0 0 0 2 2h1v-6H5a2 2 0 0 0-2 2z" />
+  </Icon>
+);
+
 export const StopIcon = () => (
   <Icon>
     <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />

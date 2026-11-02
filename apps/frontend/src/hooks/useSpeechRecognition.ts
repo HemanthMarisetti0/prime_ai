@@ -41,14 +41,18 @@ const ERROR_MESSAGES: Record<string, string> = {
 interface Options {
   /** Called with the full transcript of the current listening session as it updates. */
   onTranscript: (text: string) => void;
-  onError: (message: string) => void;
+  /** Called when a session ends on its own or via stop(); receives the final transcript ('' if none). Not called after abort(). */
+  onEnd?: (text: string) => void;
+  onError: (message: string, code: string) => void;
 }
 
-export function useSpeechRecognition({ onTranscript, onError }: Options) {
+export function useSpeechRecognition({ onTranscript, onEnd, onError }: Options) {
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<Recognition | null>(null);
-  const callbacksRef = useRef({ onTranscript, onError });
-  callbacksRef.current = { onTranscript, onError };
+  const transcriptRef = useRef('');
+  const abortedRef = useRef(false);
+  const callbacksRef = useRef({ onTranscript, onEnd, onError });
+  callbacksRef.current = { onTranscript, onEnd, onError };
 
   useEffect(() => () => recognitionRef.current?.abort(), []);
 
@@ -59,19 +63,26 @@ export function useSpeechRecognition({ onTranscript, onError }: Options) {
     recognition.lang = navigator.language || 'en-US';
     recognition.continuous = false;
     recognition.interimResults = true;
+    transcriptRef.current = '';
+    abortedRef.current = false;
 
     recognition.onresult = (event) => {
       const parts: string[] = [];
       for (let i = 0; i < event.results.length; i++) parts.push(event.results[i][0].transcript.trim());
-      callbacksRef.current.onTranscript(parts.join(' ').trim());
+      transcriptRef.current = parts.join(' ').trim();
+      callbacksRef.current.onTranscript(transcriptRef.current);
     };
     recognition.onerror = (event) => {
       if (event.error === 'aborted') return;
-      callbacksRef.current.onError(ERROR_MESSAGES[event.error] ?? 'Speech recognition failed. Please try again.');
+      callbacksRef.current.onError(
+        ERROR_MESSAGES[event.error] ?? 'Speech recognition failed. Please try again.',
+        event.error,
+      );
     };
     recognition.onend = () => {
       recognitionRef.current = null;
       setIsListening(false);
+      if (!abortedRef.current) callbacksRef.current.onEnd?.(transcriptRef.current);
     };
 
     recognitionRef.current = recognition;
@@ -80,11 +91,18 @@ export function useSpeechRecognition({ onTranscript, onError }: Options) {
       setIsListening(true);
     } catch {
       recognitionRef.current = null;
-      callbacksRef.current.onError('Unable to start the microphone.');
+      callbacksRef.current.onError('Unable to start the microphone.', 'start-failed');
     }
   }, []);
 
+  /** Stops listening and delivers what was heard so far. */
   const stop = useCallback(() => recognitionRef.current?.stop(), []);
 
-  return { isSupported: isSpeechRecognitionSupported, isListening, start, stop };
+  /** Stops listening and discards the session. */
+  const abort = useCallback(() => {
+    abortedRef.current = true;
+    recognitionRef.current?.abort();
+  }, []);
+
+  return { isSupported: isSpeechRecognitionSupported, isListening, start, stop, abort };
 }
