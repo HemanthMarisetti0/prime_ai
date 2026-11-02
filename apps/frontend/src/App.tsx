@@ -9,6 +9,7 @@ import { Header, type Account } from './components/Header';
 import { MessageList } from './components/MessageList';
 import { NewsPanel } from './components/NewsPanel';
 import { PlacesPanel } from './components/PlacesPanel';
+import { QuickActions } from './components/QuickActions';
 import { Reactor, type ReactorState } from './components/Reactor';
 import { TripPanel } from './components/TripPanel';
 import { VoiceSettings } from './components/VoiceSettings';
@@ -347,6 +348,7 @@ export default function App({ account, onSignOut }: AppProps) {
 
   const exchangeCount = chat.messages.length;
 
+  const [voiceSettingsOpen, setVoiceSettingsOpen] = useState(false);
   const [booting, setBooting] = useState(shouldShowBoot);
   const finishBoot = useCallback(() => {
     setBooting(false);
@@ -383,6 +385,8 @@ export default function App({ account, onSignOut }: AppProps) {
             onRateChange={speech.setRate}
             onTest={speech.speak}
             disabled={!speech.isSupported}
+            open={voiceSettingsOpen}
+            onOpenChange={setVoiceSettingsOpen}
           />
         }
         onNewConversation={handleNew}
@@ -392,6 +396,7 @@ export default function App({ account, onSignOut }: AppProps) {
         onToggleDiagnostics={toggleDiagnostics}
         wakeStatus={wakeStatus}
         onToggleWakeWord={toggleWakeWord}
+        onOpenVoiceSettings={() => setVoiceSettingsOpen(true)}
         account={account}
         onSignOut={() => {
           stopSpeaking();
@@ -457,6 +462,9 @@ export default function App({ account, onSignOut }: AppProps) {
             <span className="comms__count">{String(exchangeCount).padStart(2, '0')} entries</span>
           </div>
           <MessageList messages={chat.messages} isLoading={chat.isLoading} />
+          {chat.messages.length === 1 && !chat.isLoading && (
+            <QuickActions onSelect={(prompt) => void handleSend(prompt)} disabled={serverStatus === 'offline'} />
+          )}
           {errorMessage && <ErrorBanner message={errorMessage} onDismiss={handleDismissError} />}
           <ChatInput
             key={chat.conversationId}

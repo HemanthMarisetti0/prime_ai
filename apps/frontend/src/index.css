@@ -2186,3 +2186,365 @@ select {
     transform: none;
   }
 }
+
+/* =====================================================================
+   Polish + phone layout
+   ===================================================================== */
+
+/* Respect notches and the home indicator. */
+.hud {
+  padding:
+    max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right))
+    max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+}
+
+/* Messages fade out under the panel header instead of being cut off. */
+.messages {
+  mask-image: linear-gradient(180deg, transparent 0, #000 18px, #000 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0, #000 18px, #000 100%);
+}
+
+.message__body {
+  line-height: 1.6;
+}
+
+/* Header: separate the conversation buttons from the toggles. */
+.topbar__actions > .hud-btn:not(.hud-btn--icon) {
+  margin-left: 6px;
+}
+
+/* ---------- Quick actions ---------- */
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 20px 12px;
+  animation: message-in 0.3s ease-out 0.15s both;
+}
+
+.quick-actions__chip {
+  padding: 7px 14px;
+  border: 1px solid var(--line-strong);
+  background: rgb(0 212 255 / 0.05);
+  color: var(--cyan-soft);
+  font-family: var(--font-hud);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  cursor: pointer;
+  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
+  transition: background 0.2s, color 0.2s, border-color 0.2s;
+}
+
+.quick-actions__chip:not(:disabled):hover {
+  color: var(--cyan);
+  border-color: var(--cyan);
+  background: rgb(0 212 255 / 0.12);
+}
+
+.quick-actions__chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---------- Overflow menu (phones) ---------- */
+.topbar__menu {
+  position: relative;
+  display: none;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 10;
+  width: min(270px, calc(100vw - 24px));
+  padding: 6px;
+  border: 1px solid var(--line-strong);
+  background: var(--corners), var(--panel-solid);
+  --bracket: 10px;
+  box-shadow: 0 18px 40px -12px rgb(0 0 0 / 0.8), 0 0 24px -12px var(--cyan-glow);
+  animation: message-in 0.16s ease-out both;
+}
+
+.menu__account {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+}
+
+.menu__account-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.menu__account-name {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.menu__account-email {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.menu__item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 10px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-family: var(--font-hud);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-align: left;
+  cursor: pointer;
+}
+
+.menu__item svg {
+  color: var(--cyan);
+  flex-shrink: 0;
+}
+
+.menu__item:not(:disabled):hover,
+.menu__item:not(:disabled):focus-visible {
+  background: rgb(0 212 255 / 0.08);
+}
+
+.menu__item:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.menu__item--danger,
+.menu__item--danger svg {
+  color: var(--red);
+}
+
+/* ---------- Voice settings header ---------- */
+.settings__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.settings__close {
+  width: 30px;
+  height: 30px;
+}
+
+/* ---------- Phones ---------- */
+@media (max-width: 640px) {
+  .hud {
+    padding:
+      max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right))
+      max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+    gap: 6px;
+  }
+
+  .hud__body {
+    gap: 6px;
+  }
+
+  /* Header: brand + wake, voice, new and the ⋯ menu. */
+  .topbar {
+    padding: 8px 10px;
+    --bracket: 10px;
+  }
+
+  .topbar__title {
+    font-size: 1rem;
+    letter-spacing: 0.18em;
+  }
+
+  .topbar__secondary,
+  .settings__toggle {
+    display: none !important;
+  }
+
+  .topbar__menu {
+    display: block;
+  }
+
+  .topbar__actions {
+    gap: 0;
+  }
+
+  .topbar__actions > .hud-btn:not(.hud-btn--icon) {
+    width: 36px;
+    padding: 0;
+    margin-left: 2px;
+  }
+
+  /* Voice settings become a bottom sheet. */
+  .settings__panel {
+    position: fixed;
+    top: auto;
+    left: max(8px, env(safe-area-inset-left));
+    right: max(8px, env(safe-area-inset-right));
+    bottom: max(8px, env(safe-area-inset-bottom));
+    width: auto;
+    z-index: 60;
+  }
+
+  /* Compact core strip. */
+  .core-panel {
+    gap: 12px;
+    padding: 8px 12px;
+    --bracket: 10px;
+  }
+
+  .hud__left .reactor {
+    width: 64px;
+  }
+
+  .core-panel__state {
+    font-size: 0.85rem;
+    letter-spacing: 0.22em;
+  }
+
+  .core-panel__hint {
+    margin-top: 2px;
+    font-size: 0.88rem;
+    line-height: 1.35;
+  }
+
+  .core-panel__link {
+    display: none;
+  }
+
+  .comms {
+    --bracket: 10px;
+  }
+
+  .comms__header {
+    padding: 9px 14px;
+    font-size: 0.72rem;
+  }
+
+  .messages {
+    gap: 14px;
+  }
+
+  .message__body {
+    padding: 10px 12px;
+    font-size: 0.95rem;
+  }
+
+  /* Chips scroll sideways instead of stacking. */
+  .quick-actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding: 0 12px 10px;
+    scrollbar-width: none;
+  }
+
+  .quick-actions::-webkit-scrollbar {
+    display: none;
+  }
+
+  .quick-actions__chip {
+    flex-shrink: 0;
+  }
+
+  /* Composer. */
+  .composer {
+    padding: 8px 8px 8px;
+  }
+
+  .composer__field {
+    gap: 2px;
+    padding: 4px 4px 4px 10px;
+  }
+
+  .composer__input {
+    font-size: 16px; /* prevents iOS zoom on focus */
+    min-height: 38px;
+  }
+
+  .icon-btn {
+    width: 38px;
+    height: 38px;
+  }
+
+  .composer__attachment img {
+    width: 48px;
+    height: 34px;
+  }
+
+  /* Side panels: tighter padding, sensible heights. */
+  .side-panel {
+    padding: 10px 12px 12px;
+  }
+
+  .hud__left {
+    max-height: 55%;
+  }
+
+  .weather__temp {
+    font-size: 2rem;
+  }
+
+  .weather__days {
+    gap: 6px;
+  }
+
+  .directions__summary {
+    gap: 18px;
+  }
+
+  .trip__total-value {
+    font-size: 1.3rem;
+  }
+
+  .media__list {
+    max-height: 16vh;
+  }
+
+  /* Login and boot screens. */
+  .login__panel {
+    padding: 24px 18px 20px;
+  }
+
+  .boot__checks {
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 380px) {
+  .topbar__title {
+    font-size: 0.9rem;
+    letter-spacing: 0.12em;
+  }
+
+  .hud-btn--icon {
+    width: 32px;
+  }
+}
+
+/* Let the textarea shrink below its intrinsic ~20-column width. */
+.composer__input {
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .composer__prompt {
+    display: none;
+  }
+
+  .composer__field {
+    align-items: center;
+  }
+}
