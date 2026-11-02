@@ -1,10 +1,15 @@
 import { Module } from '@nestjs/common';
+import { CurrencyService } from './currency.service';
+import { DirectionsService } from './directions.service';
+import { GeoService } from './geo.service';
 import { NewsService } from './news.service';
 import { WeatherService } from './weather.service';
 import { YouTubeService } from './youtube.service';
 
+const SERVICES = [WeatherService, NewsService, YouTubeService, GeoService, DirectionsService, CurrencyService];
+
 @Module({
-  providers: [WeatherService, NewsService, YouTubeService],
-  exports: [WeatherService, NewsService, YouTubeService],
+  providers: SERVICES,
+  exports: SERVICES,
 })
 export class ToolsModule {}

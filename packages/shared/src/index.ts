@@ -76,6 +76,52 @@ export interface NewsReport {
   items: NewsItem[];
 }
 
+export interface Place {
+  name: string;
+  address: string;
+  category: string;
+  latitude: number;
+  longitude: number;
+  /** Straight-line distance from Sir, when Sir's location is known. */
+  distanceKm: number | null;
+  mapsUrl: string;
+}
+
+export interface PlacesResult {
+  query: string;
+  near: string | null;
+  places: Place[];
+}
+
+export type TravelMode = 'driving' | 'walking' | 'cycling' | 'transit';
+
+export interface DirectionsResult {
+  from: string;
+  to: string;
+  mode: TravelMode;
+  /** Road distance, or straight-line distance for transit (no route computed). */
+  distanceKm: number;
+  /** Estimated travel time without live traffic; null for transit. */
+  durationMinutes: number | null;
+  steps: { instruction: string; distanceKm: number }[];
+  /** Opens turn-by-turn navigation in Google Maps. */
+  navigationUrl: string;
+}
+
+export interface TripPlan {
+  destination: string;
+  durationDays: number;
+  travellers: number;
+  summary: string;
+  days: { day: number; title: string; activities: string[] }[];
+  budget: {
+    currency: string;
+    items: { category: string; amount: number; note?: string }[];
+    total: number;
+  };
+  tips: string[];
+}
+
 /** Extra HUD panels the frontend should show alongside a reply. */
 export type ChatDisplay = 'system';
 
@@ -85,6 +131,9 @@ export interface ChatResponse {
   weather?: WeatherReport;
   news?: NewsReport;
   youtube?: YouTubeResults;
+  places?: PlacesResult;
+  directions?: DirectionsResult;
+  trip?: TripPlan;
 }
 
 export interface HealthResponse {

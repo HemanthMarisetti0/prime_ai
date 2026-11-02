@@ -2,11 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { YouTubeVideo } from '@prime/shared';
 import { ChatInput } from './components/ChatInput';
 import { DiagnosticsPanel } from './components/DiagnosticsPanel';
+import { DirectionsPanel } from './components/DirectionsPanel';
 import { ErrorBanner } from './components/ErrorBanner';
 import { Header, type Account } from './components/Header';
 import { MessageList } from './components/MessageList';
 import { NewsPanel } from './components/NewsPanel';
+import { PlacesPanel } from './components/PlacesPanel';
 import { Reactor, type ReactorState } from './components/Reactor';
+import { TripPanel } from './components/TripPanel';
 import { VoiceSettings } from './components/VoiceSettings';
 import { WeatherPanel } from './components/WeatherPanel';
 import { VOLUME_STEP, YouTubePanel, type MediaControls, type MediaSession } from './components/YouTubePanel';
@@ -22,8 +25,11 @@ import { useSystemStats } from './hooks/useSystemStats';
 
 const VOICE_REPLIES_KEY = 'prime.voiceReplies';
 
-const WEATHER_HINT =
-  /\b(weather|forecast|temperature|rain\w*|umbrella|sunny|cloudy|humid\w*|windy|snow\w*|storm\w*|degrees)\b/i;
+// Messages that likely need Sir's location (weather, nearby places, directions).
+const LOCATION_HINT =
+  /\b(weather|forecast|temperature|rain\w*|umbrella|sunny|cloudy|humid\w*|windy|snow\w*|storm\w*|degrees|near me|nearby|nearest|closest|around here|directions?|route|navigate|how far|how long (does it take|to get|to reach)|get to|take me to|way to)\b/i;
+
+type InfoPanel = 'weather' | 'news' | 'places' | 'directions' | 'trip';
 
 const STATE_LABEL: Record<ReactorState, string> = {
   connecting: 'Initialising',
@@ -178,7 +184,7 @@ export default function App({ account, onSignOut }: AppProps) {
       }
 
       // Ask for location only once weather comes up; afterwards it is reused for the session.
-      const location = knownLocation() ?? (WEATHER_HINT.test(text) ? await getLocation() : null);
+      const location = knownLocation() ?? (LOCATION_HINT.test(text) ? await getLocation() : null);
       const media = mediaSession?.current ? { title: mediaSession.current.title, playing: mediaPlaying } : null;
       return send(text, { location, media });
     },
@@ -252,18 +258,23 @@ export default function App({ account, onSignOut }: AppProps) {
       : latestReply?.display === 'system';
   const toggleDiagnostics = () => setDiagnosticsOverride({ replyId: latestReply?.id, open: !showDiagnostics });
 
-  // Weather and news panels show with the reply that fetched them, until closed or superseded.
-  const [closedPanels, setClosedPanels] = useState<{ replyId?: string; panels: ('weather' | 'news')[] }>({ panels: [] });
-  const isClosed = (panel: 'weather' | 'news') =>
+  // Info panels show with the reply that fetched them, until closed or superseded.
+  const [closedPanels, setClosedPanels] = useState<{ replyId?: string; panels: InfoPanel[] }>({ panels: [] });
+  const isClosed = (panel: InfoPanel) =>
     closedPanels.replyId === latestReply?.id && closedPanels.panels.includes(panel);
-  const closePanel = (panel: 'weather' | 'news') =>
+  const closePanel = (panel: InfoPanel) =>
     setClosedPanels((prev) => ({
       replyId: latestReply?.id,
       panels: prev.replyId === latestReply?.id ? [...prev.panels, panel] : [panel],
     }));
   const weatherReport = isClosed('weather') ? undefined : latestReply?.weather;
   const newsReport = isClosed('news') ? undefined : latestReply?.news;
-  const hasSidePanel = showDiagnostics || Boolean(weatherReport) || Boolean(newsReport) || Boolean(mediaSession);
+  const placesResult = isClosed('places') ? undefined : latestReply?.places;
+  const directionsResult = isClosed('directions') ? undefined : latestReply?.directions;
+  const tripPlan = isClosed('trip') ? undefined : latestReply?.trip;
+  const hasSidePanel =
+    showDiagnostics ||
+    Boolean(mediaSession || weatherReport || newsReport || placesResult || directionsResult || tripPlan);
 
   // Lower the music while P.R.I.M.E. speaks or listens.
   const mediaDucked = speech.isSpeaking || handsFreeSession.phase === 'listening';
@@ -361,6 +372,9 @@ export default function App({ account, onSignOut }: AppProps) {
           )}
           {weatherReport && <WeatherPanel report={weatherReport} onClose={() => closePanel('weather')} />}
           {newsReport && <NewsPanel report={newsReport} onClose={() => closePanel('news')} />}
+          {directionsResult && <DirectionsPanel result={directionsResult} onClose={() => closePanel('directions')} />}
+          {placesResult && <PlacesPanel result={placesResult} onClose={() => closePanel('places')} />}
+          {tripPlan && <TripPanel plan={tripPlan} onClose={() => closePanel('trip')} />}
         </div>
 
         <section className="comms panel" aria-label="Conversation">

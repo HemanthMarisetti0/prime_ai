@@ -1,4 +1,13 @@
-import type { ChatDisplay, ChatResponse, NewsReport, WeatherReport, YouTubeResults } from '@prime/shared';
+import type {
+  ChatDisplay,
+  ChatResponse,
+  DirectionsResult,
+  NewsReport,
+  PlacesResult,
+  TripPlan,
+  WeatherReport,
+  YouTubeResults,
+} from '@prime/shared';
 
 export class ChatResponseDto implements ChatResponse {
   reply: string;
@@ -6,4 +15,7 @@ export class ChatResponseDto implements ChatResponse {
   weather?: WeatherReport;
   news?: NewsReport;
   youtube?: YouTubeResults;
+  places?: PlacesResult;
+  directions?: DirectionsResult;
+  trip?: TripPlan;
 }

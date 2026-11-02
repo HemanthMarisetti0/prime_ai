@@ -1,5 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ChatDisplay, ChatMessage, ChatRole, NewsReport, WeatherReport, YouTubeResults } from '@prime/shared';
+import type {
+  ChatDisplay,
+  ChatMessage,
+  ChatRole,
+  DirectionsResult,
+  NewsReport,
+  PlacesResult,
+  TripPlan,
+  WeatherReport,
+  YouTubeResults,
+} from '@prime/shared';
 import { sendChat, type ChatContext } from '../api/chat';
 
 export interface UiMessage extends ChatMessage {
@@ -10,6 +20,9 @@ export interface UiMessage extends ChatMessage {
   weather?: WeatherReport;
   news?: NewsReport;
   youtube?: YouTubeResults;
+  places?: PlacesResult;
+  directions?: DirectionsResult;
+  trip?: TripPlan;
 }
 
 // Mirror the backend validation limits (apps/backend/src/ai/dto/chat-request.dto.ts).

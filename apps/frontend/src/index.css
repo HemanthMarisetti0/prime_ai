@@ -1685,3 +1685,266 @@ select {
 .media__link:hover {
   text-decoration: underline;
 }
+
+/* ---------- Places ---------- */
+.places__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 30vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.places__item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.places__item:last-child {
+  border-bottom: 0;
+}
+
+.places__main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.places__name {
+  color: var(--text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.places__name:hover {
+  color: var(--cyan-soft);
+  text-decoration: underline;
+}
+
+.places__address {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.places__meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+  font-family: var(--font-hud);
+  text-transform: uppercase;
+}
+
+.places__distance {
+  font-family: var(--font-brand);
+  font-size: 0.85rem;
+  color: var(--cyan);
+}
+
+.places__category {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  color: var(--text-faint);
+}
+
+/* ---------- Directions ---------- */
+.directions__ends {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  font-family: var(--font-hud);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.directions__arrow {
+  color: var(--cyan);
+}
+
+.directions__summary {
+  display: flex;
+  gap: 28px;
+  margin: 12px 0;
+}
+
+.directions__summary > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.directions__value {
+  font-family: var(--font-brand);
+  font-size: 1.35rem;
+  color: var(--cyan);
+  text-shadow: 0 0 12px var(--cyan-glow);
+}
+
+.directions__label {
+  font-family: var(--font-hud);
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.directions__steps {
+  margin: 0 0 12px;
+  padding: 0 0 0 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 24vh;
+  overflow-y: auto;
+  font-size: 0.86rem;
+  color: var(--text);
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.directions__steps li::marker {
+  color: var(--cyan);
+  font-family: var(--font-hud);
+}
+
+.directions__step-distance {
+  margin-left: 8px;
+  font-family: var(--font-hud);
+  font-size: 0.75rem;
+  color: var(--text-faint);
+}
+
+.directions__navigate {
+  text-decoration: none;
+}
+
+/* ---------- Trip plan ---------- */
+.trip__summary {
+  margin: 0 0 12px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.trip__total {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 10px;
+}
+
+.trip__total-value {
+  font-family: var(--font-brand);
+  font-size: 1.6rem;
+  color: var(--cyan);
+  text-shadow: 0 0 14px var(--cyan-glow);
+}
+
+.trip__total-label {
+  font-family: var(--font-hud);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.trip__items {
+  margin: 0 0 14px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.trip__items > li {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 6px;
+  font-size: 0.86rem;
+}
+
+.trip__item-name {
+  display: flex;
+  flex-direction: column;
+  color: var(--text);
+}
+
+.trip__item-note {
+  font-size: 0.75rem;
+  color: var(--text-faint);
+}
+
+.trip__item-amount {
+  font-family: var(--font-hud);
+  font-weight: 700;
+  color: var(--cyan-soft);
+  white-space: nowrap;
+}
+
+.trip__item-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--cyan), transparent);
+}
+
+.trip__days {
+  margin: 0;
+  padding: 12px 0 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.trip__day-label {
+  font-family: var(--font-hud);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  margin-right: 10px;
+}
+
+.trip__day-title {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.trip__days ul,
+.trip__tips {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.trip__tips {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  list-style: '› ';
+}
+
+.trip__disclaimer {
+  margin: 12px 0 0;
+  font-size: 0.72rem;
+  font-style: italic;
+  color: var(--text-faint);
+}
