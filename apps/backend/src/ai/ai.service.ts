@@ -9,12 +9,12 @@ import {
 } from '@nestjs/common';
 import { ApiError, GoogleGenAI, type Content, type FunctionCall, type FunctionDeclaration } from '@google/genai';
 import type { ChatMessage, ChatResponse, NewsReport, UserLocation, WeatherReport } from '@prime/shared';
+import { env } from '../config/env';
 import { describeSnapshot, SystemService } from '../system/system.service';
 import { NewsService } from '../tools/news.service';
 import { WeatherService } from '../tools/weather.service';
 import { buildSystemInstruction, SYSTEM_DISPLAY_TAG } from './prime.persona';
 
-const DEFAULT_MODEL = 'gemini-2.5-flash';
 const REQUEST_TIMEOUT_MS = 30_000;
 // Upper bound on model <-> tool round trips per message.
 const MAX_TOOL_ROUNDS = 3;
@@ -57,7 +57,7 @@ const DISPLAY_TAG_PATTERN = new RegExp(`\\s*${escapeRegExp(SYSTEM_DISPLAY_TAG)}\
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
-  private readonly model = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
+  private readonly model = env.gemini.model;
   private readonly client: GoogleGenAI | null;
 
   constructor(
@@ -65,7 +65,7 @@ export class AiService {
     private readonly weatherService: WeatherService,
     private readonly newsService: NewsService,
   ) {
-    const apiKey = process.env.GEMINI_API_KEY?.trim();
+    const { apiKey } = env.gemini;
     if (!apiKey) {
       this.logger.warn('GEMINI_API_KEY is not set; /api/chat will return 503.');
     }

@@ -5,9 +5,9 @@
   "scripts": {
     "dev": "tsc && pnpm run \"/^dev:/\"",
     "dev:tsc": "tsc --watch --preserveWatchOutput",
-    "dev:node": "node --env-file-if-exists=.env --watch dist/main.js",
+    "dev:node": "node --env-file-if-exists=.env.development --watch dist/main.js",
     "build": "tsc",
-    "start": "node --env-file-if-exists=.env dist/main.js",
+    "start": "node --env-file=.env.production dist/main.js",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -18,6 +18,7 @@
     "@prime/shared": "workspace:*",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
+    "jose": "^6.2.14",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",
     "systeminformation": "^5.33.19"

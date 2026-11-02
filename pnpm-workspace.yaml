@@ -6,3 +6,4 @@ packages:
 allowBuilds:
   '@google/genai': false
   protobufjs: false
+  '@firebase/util': false

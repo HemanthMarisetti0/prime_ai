@@ -2,6 +2,7 @@ import { Injectable, Logger, type OnModuleDestroy, type OnModuleInit } from '@ne
 import * as os from 'node:os';
 import * as si from 'systeminformation';
 import type { SystemSnapshot } from '@prime/shared';
+import { env } from '../config/env';
 
 // Slow probes (PowerShell / nvidia-smi on Windows) refresh in the background at this interval.
 const SLOW_REFRESH_MS = 30_000;
@@ -19,7 +20,7 @@ const percent = (part: number, total: number) => (total > 0 ? round1((part / tot
 @Injectable()
 export class SystemService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(SystemService.name);
-  readonly enabled = (process.env.SYSTEM_MONITOR ?? 'true').toLowerCase() !== 'false';
+  readonly enabled = env.systemMonitor;
 
   private staticData: Promise<StaticData> | null = null;
   private slowData: SlowData | null = null;

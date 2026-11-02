@@ -1,7 +1,13 @@
 import type { ReactNode } from 'react';
 import { useClock } from '../hooks/useClock';
 import type { ServerStatus } from '../hooks/useServerStatus';
-import { ActivityIcon, PlusIcon, TrashIcon, VolumeIcon, VolumeOffIcon } from './icons';
+import { ActivityIcon, LogoutIcon, PlusIcon, TrashIcon, VolumeIcon, VolumeOffIcon } from './icons';
+
+export interface Account {
+  name: string;
+  email: string;
+  photoURL: string | null;
+}
 
 const LINK_LABEL: Record<ServerStatus, string> = {
   checking: 'Linking',
@@ -20,6 +26,8 @@ interface HeaderProps {
   canClear: boolean;
   diagnosticsOpen: boolean;
   onToggleDiagnostics: () => void;
+  account: Account | null;
+  onSignOut: () => void;
 }
 
 export function Header({
@@ -33,6 +41,8 @@ export function Header({
   canClear,
   diagnosticsOpen,
   onToggleDiagnostics,
+  account,
+  onSignOut,
 }: HeaderProps) {
   const now = useClock();
   const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -108,6 +118,26 @@ export function Header({
           <PlusIcon />
           <span className="hud-btn__label">New</span>
         </button>
+        {account && (
+          <div className="account" title={account.email}>
+            {account.photoURL ? (
+              <img className="account__avatar" src={account.photoURL} alt="" referrerPolicy="no-referrer" />
+            ) : (
+              <span className="account__avatar account__avatar--initial" aria-hidden="true">
+                {account.name.charAt(0).toUpperCase()}
+              </span>
+            )}
+            <button
+              type="button"
+              className="hud-btn hud-btn--icon"
+              onClick={onSignOut}
+              title={`Sign out (${account.email})`}
+              aria-label="Sign out"
+            >
+              <LogoutIcon />
+            </button>
+          </div>
+        )}
       </div>
     </header>
   );

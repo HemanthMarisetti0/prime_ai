@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { NewsItem, NewsReport } from '@prime/shared';
+import { env } from '../config/env';
 
 const CACHE_TTL_MS = 10 * 60_000;
 const TIMEOUT_MS = 8000;
@@ -54,7 +55,7 @@ function parseItems(xml: string): NewsItem[] {
 /** Headlines via Google News RSS (free; personal, non-commercial use). */
 @Injectable()
 export class NewsService {
-  private readonly region = (process.env.NEWS_REGION ?? 'IN').toUpperCase();
+  private readonly region = env.newsRegion;
   private readonly cache = new Map<string, { at: number; report: NewsReport }>();
 
   async getNews(topic: string | undefined): Promise<NewsReport> {

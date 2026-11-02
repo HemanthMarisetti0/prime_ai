@@ -1471,3 +1471,116 @@ select {
     display: none;
   }
 }
+
+/* ---------- Account ---------- */
+.account {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 6px;
+  padding-left: 10px;
+  border-left: 1px solid var(--line);
+}
+
+.account__avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 0 10px -2px var(--cyan-glow);
+  object-fit: cover;
+}
+
+.account__avatar--initial {
+  display: grid;
+  place-items: center;
+  font-family: var(--font-brand);
+  font-size: 0.8rem;
+  color: var(--cyan);
+  background: rgb(0 212 255 / 0.08);
+}
+
+/* ---------- Login ---------- */
+.login {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.login__panel {
+  width: min(440px, 100%);
+  padding: 32px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  --reactor: var(--cyan);
+  animation: message-in 0.4s ease-out both;
+}
+
+.login__reactor {
+  width: min(220px, 60vw);
+  margin-bottom: 18px;
+}
+
+.login__reactor .reactor {
+  width: 100%;
+  cursor: default;
+}
+
+.login__brand {
+  margin: 0;
+  font-family: var(--font-brand);
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 0.3em;
+  color: var(--cyan);
+  text-shadow: 0 0 18px var(--cyan-glow);
+}
+
+.login__subtitle {
+  margin: 4px 0 0;
+  font-family: var(--font-hud);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.login__status {
+  margin: 26px 0 0;
+  font-family: var(--font-brand);
+  font-size: 0.85rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--amber);
+  text-shadow: 0 0 12px rgb(255 181 71 / 0.5);
+  animation: blink 2.4s ease-in-out infinite;
+}
+
+.login__message {
+  margin: 10px 0 22px;
+  font-family: var(--font-hud);
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.login__button {
+  height: 44px;
+  padding: 0 22px;
+  gap: 10px;
+  font-size: 0.95rem;
+}
+
+.login__error {
+  margin: 16px 0 0;
+  padding: 10px 14px;
+  border-left: 2px solid var(--red);
+  background: rgb(255 92 92 / 0.1);
+  color: #ffc9c9;
+  font-size: 0.88rem;
+  text-align: left;
+}

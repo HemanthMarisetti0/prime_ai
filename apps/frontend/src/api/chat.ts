@@ -1,5 +1,5 @@
 import type { ApiErrorResponse, ChatMessage, ChatRequest, ChatResponse, UserLocation } from '@prime/shared';
-import { API_BASE } from './config';
+import { API_BASE, authHeaders } from './config';
 
 const UNREACHABLE = 'My apologies, Sir. I cannot reach my server. Kindly check that the backend is running.';
 
@@ -25,7 +25,7 @@ export async function sendChat(
   try {
     res = await fetch(`${API_BASE}/api/chat`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
       body: JSON.stringify(body),
       signal,
     });

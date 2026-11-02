@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChatInput } from './components/ChatInput';
 import { DiagnosticsPanel } from './components/DiagnosticsPanel';
 import { ErrorBanner } from './components/ErrorBanner';
-import { Header } from './components/Header';
+import { Header, type Account } from './components/Header';
 import { MessageList } from './components/MessageList';
 import { NewsPanel } from './components/NewsPanel';
 import { Reactor, type ReactorState } from './components/Reactor';
@@ -37,7 +37,13 @@ function loadVoiceReplies(): boolean {
   }
 }
 
-export default function App() {
+interface AppProps {
+  /** Signed-in user, or null when sign-in is disabled (local development without Firebase). */
+  account: Account | null;
+  onSignOut: () => void;
+}
+
+export default function App({ account, onSignOut }: AppProps) {
   const chat = useChat();
   const serverStatus = useServerStatus(chat.error);
   const speech = useSpeechSynthesis();
@@ -200,6 +206,12 @@ export default function App() {
         canClear={chat.messages.length > 1 || chat.isLoading}
         diagnosticsOpen={showDiagnostics}
         onToggleDiagnostics={toggleDiagnostics}
+        account={account}
+        onSignOut={() => {
+          stopSpeaking();
+          setHandsFree(false);
+          onSignOut();
+        }}
       />
 
       <main className="hud__body">
