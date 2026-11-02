@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { YouTubeVideo } from '@prime/shared';
 import { ChatInput } from './components/ChatInput';
 import { DiagnosticsPanel } from './components/DiagnosticsPanel';
 import { ErrorBanner } from './components/ErrorBanner';
@@ -8,6 +9,8 @@ import { NewsPanel } from './components/NewsPanel';
 import { Reactor, type ReactorState } from './components/Reactor';
 import { VoiceSettings } from './components/VoiceSettings';
 import { WeatherPanel } from './components/WeatherPanel';
+import { VOLUME_STEP, YouTubePanel, type MediaControls, type MediaSession } from './components/YouTubePanel';
+import { parseMediaCommand, type MediaCommand } from './media/commands';
 import { useChat } from './hooks/useChat';
 import { useGeolocation } from './hooks/useGeolocation';
 import { useHandsFree } from './hooks/useHandsFree';
@@ -72,20 +75,98 @@ export default function App({ account, onSignOut }: AppProps) {
     }
   };
 
-  const { send, clearConversation, newConversation, dismissError } = chat;
+  const { send, clearConversation, newConversation, dismissError, addLocalExchange } = chat;
   const { stop: stopSpeaking } = speech;
 
   const { getLocation, knownLocation } = useGeolocation();
+
+  // YouTube player session: started by replies that searched YouTube, kept across the conversation.
+  const [mediaSession, setMediaSession] = useState<MediaSession | null>(null);
+  const [mediaPlaying, setMediaPlaying] = useState(false);
+  const mediaControlsRef = useRef<MediaControls | null>(null);
+  const lastMediaReplyRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const reply = chat.messages.at(-1);
+    if (!reply?.youtube || lastMediaReplyRef.current === reply.id) return;
+    lastMediaReplyRef.current = reply.id;
+    const { youtube } = reply;
+    setMediaSession((prev) => ({
+      results: youtube,
+      // Suggestions alone shouldn't interrupt something that's already playing.
+      current: youtube.autoplay || !prev?.current || !mediaPlaying ? (youtube.videos[0] ?? null) : prev.current,
+      autoplay: youtube.autoplay,
+      nonce: (prev?.nonce ?? 0) + 1,
+    }));
+    if (youtube.autoplay) setMediaPlaying(true);
+  }, [chat.messages, mediaPlaying]);
+
+  const playVideo = useCallback((video: YouTubeVideo) => {
+    setMediaSession((prev) => prev && { ...prev, current: video, autoplay: true, nonce: prev.nonce + 1 });
+  }, []);
+
+  const closeMedia = useCallback(() => {
+    setMediaSession(null);
+    setMediaPlaying(false);
+  }, []);
+
+  const nextVideo = (session: MediaSession): YouTubeVideo | undefined => {
+    const { videos } = session.results;
+    const index = videos.findIndex((v) => v.videoId === session.current?.videoId);
+    return videos[index + 1];
+  };
+
+  /** Executes a playback command locally and returns P.R.I.M.E.'s acknowledgement. */
+  const runMediaCommand = (command: MediaCommand, session: MediaSession): string => {
+    const controls = mediaControlsRef.current;
+    switch (command) {
+      case 'pause':
+        controls?.pause();
+        return 'Paused, Sir.';
+      case 'resume':
+        controls?.resume();
+        return 'Resuming, Sir.';
+      case 'stop':
+        closeMedia();
+        return 'Playback stopped, Sir.';
+      case 'next': {
+        const next = nextVideo(session);
+        if (!next) return 'That was the last suggestion, Sir. Shall I find something else?';
+        playVideo(next);
+        return `Now playing ${next.title}, Sir.`;
+      }
+      case 'volumeUp':
+        return `Volume raised to ${controls?.changeVolume(VOLUME_STEP) ?? 0} percent, Sir.`;
+      case 'volumeDown':
+        return `Volume lowered to ${controls?.changeVolume(-VOLUME_STEP) ?? 0} percent, Sir.`;
+      case 'mute':
+        controls?.mute();
+        return 'Muted, Sir.';
+      case 'unmute':
+        controls?.unmute();
+        return 'Sound restored, Sir.';
+    }
+  };
 
   const handleSend = useCallback(
     async (text: string) => {
       stopSpeaking();
       setVoiceError(null);
+
+      // Playback commands are handled instantly in the browser, without the AI.
+      const command = mediaSession?.current ? parseMediaCommand(text) : null;
+      if (command && mediaSession) {
+        addLocalExchange(text, runMediaCommand(command, mediaSession));
+        return true;
+      }
+
       // Ask for location only once weather comes up; afterwards it is reused for the session.
       const location = knownLocation() ?? (WEATHER_HINT.test(text) ? await getLocation() : null);
-      return send(text, location);
+      const media = mediaSession?.current ? { title: mediaSession.current.title, playing: mediaPlaying } : null;
+      return send(text, { location, media });
     },
-    [send, stopSpeaking, getLocation, knownLocation],
+    // runMediaCommand only touches stable refs/setters plus mediaSession, which is listed.
+    [send, stopSpeaking, getLocation, knownLocation, mediaSession, mediaPlaying, addLocalExchange],
   );
 
   const handleClear = () => {
@@ -165,7 +246,10 @@ export default function App({ account, onSignOut }: AppProps) {
     }));
   const weatherReport = isClosed('weather') ? undefined : latestReply?.weather;
   const newsReport = isClosed('news') ? undefined : latestReply?.news;
-  const hasSidePanel = showDiagnostics || Boolean(weatherReport) || Boolean(newsReport);
+  const hasSidePanel = showDiagnostics || Boolean(weatherReport) || Boolean(newsReport) || Boolean(mediaSession);
+
+  // Lower the music while P.R.I.M.E. speaks or listens.
+  const mediaDucked = speech.isSpeaking || handsFreeSession.phase === 'listening';
 
   const coreActionLabel = handsFree
     ? 'End voice link'
@@ -216,6 +300,21 @@ export default function App({ account, onSignOut }: AppProps) {
 
       <main className="hud__body">
         <div className={`hud__left${hasSidePanel ? ' hud__left--panels' : ''}`}>
+          {mediaSession && (
+            <YouTubePanel
+              session={mediaSession}
+              ducked={mediaDucked}
+              controlsRef={mediaControlsRef}
+              onSelect={playVideo}
+              onPlayingChange={setMediaPlaying}
+              onEnded={() => {
+                const next = nextVideo(mediaSession);
+                if (next) playVideo(next);
+                else setMediaPlaying(false);
+              }}
+              onClose={closeMedia}
+            />
+          )}
           <section className={`core-panel panel core-panel--${reactorState}`} aria-label="Assistant core">
             <div className="core-panel__scan" aria-hidden="true" />
             <Reactor

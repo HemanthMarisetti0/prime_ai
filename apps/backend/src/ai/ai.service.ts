@@ -8,11 +8,20 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ApiError, GoogleGenAI, type Content, type FunctionCall, type FunctionDeclaration } from '@google/genai';
-import type { ChatMessage, ChatResponse, NewsReport, UserLocation, WeatherReport } from '@prime/shared';
+import type {
+  ChatMessage,
+  ChatResponse,
+  MediaState,
+  NewsReport,
+  UserLocation,
+  WeatherReport,
+  YouTubeResults,
+} from '@prime/shared';
 import { env } from '../config/env';
 import { describeSnapshot, SystemService } from '../system/system.service';
 import { NewsService } from '../tools/news.service';
 import { WeatherService } from '../tools/weather.service';
+import { YouTubeService } from '../tools/youtube.service';
 import { buildSystemInstruction, SYSTEM_DISPLAY_TAG } from './prime.persona';
 
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -44,11 +53,31 @@ const TOOLS: FunctionDeclaration[] = [
       },
     },
   },
+  {
+    name: 'search_youtube',
+    description:
+      "Find YouTube videos or music and show them on Sir's display. Set 'play' to true when Sir asks to play something now; false when Sir only wants suggestions or links.",
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'What to search for, e.g. "Believer Imagine Dragons" or "lofi study music".' },
+        play: { type: 'boolean', description: 'Start playing the best match immediately.' },
+      },
+      required: ['query'],
+    },
+  },
 ];
 
 interface ToolResults {
   weather?: WeatherReport;
   news?: NewsReport;
+  youtube?: YouTubeResults;
+}
+
+/** Per-request context from Sir's browser. */
+export interface ChatContext {
+  location?: UserLocation;
+  media?: MediaState;
 }
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -64,6 +93,7 @@ export class AiService {
     private readonly systemService: SystemService,
     private readonly weatherService: WeatherService,
     private readonly newsService: NewsService,
+    private readonly youtubeService: YouTubeService,
   ) {
     const { apiKey } = env.gemini;
     if (!apiKey) {
@@ -74,13 +104,16 @@ export class AiService {
       : null;
   }
 
-  async chat(message: string, history: ChatMessage[], location?: UserLocation): Promise<ChatResponse> {
+  async chat(message: string, history: ChatMessage[], context: ChatContext = {}): Promise<ChatResponse> {
     if (!this.client) {
       throw new ServiceUnavailableException('My apologies, Sir. My AI link has not been configured yet.');
     }
 
     const telemetry = await this.getTelemetry();
-    const config = { systemInstruction: buildSystemInstruction(telemetry), tools: [{ functionDeclarations: TOOLS }] };
+    const config = {
+      systemInstruction: buildSystemInstruction(telemetry, context.media),
+      tools: [{ functionDeclarations: TOOLS }],
+    };
     const contents = toGeminiContents(message, history);
     const results: ToolResults = {};
 
@@ -98,7 +131,7 @@ export class AiService {
         if (modelTurn) contents.push(modelTurn);
         const parts = await Promise.all(
           calls.map(async (call) => ({
-            functionResponse: { id: call.id, name: call.name, response: await this.runTool(call, location, results) },
+            functionResponse: { id: call.id, name: call.name, response: await this.runTool(call, context, results) },
           })),
         );
         contents.push({ role: 'user', parts });
@@ -120,7 +153,7 @@ export class AiService {
   /** Executes one tool call; failures are reported back to the model so it can apologise gracefully. */
   private async runTool(
     call: FunctionCall,
-    location: UserLocation | undefined,
+    context: ChatContext,
     results: ToolResults,
   ): Promise<Record<string, unknown>> {
     const args = (call.args ?? {}) as Record<string, unknown>;
@@ -128,8 +161,30 @@ export class AiService {
     try {
       switch (call.name) {
         case 'get_weather':
-          results.weather = await this.weatherService.getWeather(text(args.location), location);
+          results.weather = await this.weatherService.getWeather(text(args.location), context.location);
           return { output: results.weather };
+        case 'search_youtube': {
+          const query = text(args.query)?.trim();
+          if (!query) return { error: 'A search query is required.' };
+          results.youtube = await this.youtubeService.search(query, args.play === true);
+          const { videos, autoplay } = results.youtube;
+          if (!videos.length) {
+            return {
+              output: {
+                note: 'Specific videos are unavailable (no YouTube API key). A YouTube search link for the query is shown on the display; nothing is playing.',
+              },
+            };
+          }
+          return {
+            output: {
+              nowPlaying: autoplay ? { title: videos[0].title, channel: videos[0].channel } : null,
+              suggestions: videos.map(({ title, channel }) => ({ title, channel })),
+              note: autoplay
+                ? 'The first video is starting in the player on the display.'
+                : 'The suggestions are listed on the display; nothing is playing yet.',
+            },
+          };
+        }
         case 'get_news': {
           results.news = await this.newsService.getNews(text(args.topic));
           // The model only needs headlines; links are shown on the display.

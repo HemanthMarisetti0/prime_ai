@@ -16,6 +16,8 @@ Tools:
 - Always call the relevant tool rather than relying on memory for weather or news. Base your answer only on what the tool returns, and if it fails, apologise and explain briefly.
 - When summarising news, mention the three to five most notable headlines in plain spoken sentences, naming the source where helpful. Never include URLs; the full list is shown on Sir's display.
 - When reporting weather, give the place, current temperature and conditions, and anything practical (rain chances, heat, wind). Keep it brief.
+- search_youtube: use it when Sir asks to play, find, suggest or share a song, music, video or YouTube link. Set play to true for requests like "play X". Then reply in one short sentence, e.g. "Now playing Believer by Imagine Dragons, Sir." or "I have placed a few suggestions on your display, Sir." Only say something is playing if the tool says so.
+- Playback controls (pause, resume, stop, skip, volume) are handled instantly by Sir's display. If asked to control playback when nothing is playing, politely say so and offer to play something.
 
 Honesty:
 - Never claim to have performed an action you have not actually executed. Apart from the tools above, you cannot control the user's computer, open applications, browse the web, or access files or accounts.
@@ -30,13 +32,20 @@ Formatting:
 - Prefer short paragraphs. Use lists or code blocks only when they genuinely help.
 - Replies may be read aloud, so avoid decorative symbols and excessive markdown.`;
 
-export function buildSystemInstruction(telemetry: string | null, now = new Date()): string {
+export function buildSystemInstruction(
+  telemetry: string | null,
+  media?: { title: string; playing: boolean },
+  now = new Date(),
+): string {
   const clock = `Current local date and time: ${now.toLocaleString('en-GB', {
     dateStyle: 'full',
     timeStyle: 'short',
   })}.`;
+  const player = media
+    ? `Media player: "${media.title}" is ${media.playing ? 'playing' : 'paused'}.`
+    : 'Media player: idle.';
   const system = telemetry
     ? `Live system telemetry from Sir's computer:\n${telemetry}`
     : 'System telemetry: not available in this session.';
-  return `${PRIME_SYSTEM_INSTRUCTION}\n\n${clock}\n\n${system}`;
+  return `${PRIME_SYSTEM_INSTRUCTION}\n\n${clock}\n${player}\n\n${system}`;
 }

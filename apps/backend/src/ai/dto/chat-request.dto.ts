@@ -2,6 +2,7 @@ import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsIn,
   IsLatitude,
   IsLongitude,
@@ -11,7 +12,7 @@ import {
   MaxLength,
   ValidateNested,
 } from 'class-validator';
-import type { ChatMessage, ChatRequest, ChatRole, UserLocation } from '@prime/shared';
+import type { ChatMessage, ChatRequest, ChatRole, MediaState, UserLocation } from '@prime/shared';
 
 export const MAX_MESSAGE_LENGTH = 4000;
 export const MAX_HISTORY_MESSAGES = 50;
@@ -42,6 +43,15 @@ export class UserLocationDto implements UserLocation {
   label?: string;
 }
 
+export class MediaStateDto implements MediaState {
+  @IsString()
+  @MaxLength(300)
+  title: string;
+
+  @IsBoolean()
+  playing: boolean;
+}
+
 export class ChatRequestDto implements ChatRequest {
   @Transform(trim)
   @IsString()
@@ -59,4 +69,9 @@ export class ChatRequestDto implements ChatRequest {
   @ValidateNested()
   @Type(() => UserLocationDto)
   location?: UserLocationDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => MediaStateDto)
+  media?: MediaStateDto;
 }

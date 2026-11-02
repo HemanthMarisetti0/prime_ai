@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ChatDisplay, ChatMessage, ChatRole, NewsReport, UserLocation, WeatherReport } from '@prime/shared';
-import { sendChat } from '../api/chat';
+import type { ChatDisplay, ChatMessage, ChatRole, NewsReport, WeatherReport, YouTubeResults } from '@prime/shared';
+import { sendChat, type ChatContext } from '../api/chat';
 
 export interface UiMessage extends ChatMessage {
   id: string;
@@ -9,6 +9,7 @@ export interface UiMessage extends ChatMessage {
   display?: ChatDisplay;
   weather?: WeatherReport;
   news?: NewsReport;
+  youtube?: YouTubeResults;
 }
 
 // Mirror the backend validation limits (apps/backend/src/ai/dto/chat-request.dto.ts).
@@ -37,7 +38,7 @@ export function useChat() {
 
   /** Sends a message. Resolves false if it was not delivered, so the caller can restore the draft. */
   const send = useCallback(
-    async (text: string, location: UserLocation | null = null): Promise<boolean> => {
+    async (text: string, context: ChatContext = {}): Promise<boolean> => {
       const content = text.trim();
       if (!content || pendingRef.current) return false;
 
@@ -53,8 +54,8 @@ export function useChat() {
       setIsLoading(true);
 
       try {
-        const { reply, display, weather, news } = await sendChat(content, history, location, controller.signal);
-        setMessages((prev) => [...prev, { ...createMessage('assistant', reply), display, weather, news }]);
+        const { reply, ...extras } = await sendChat(content, history, context, controller.signal);
+        setMessages((prev) => [...prev, { ...createMessage('assistant', reply), ...extras }]);
         return true;
       } catch (err) {
         if (controller.signal.aborted) return false;
@@ -90,6 +91,12 @@ export function useChat() {
 
   const dismissError = useCallback(() => setError(null), []);
 
+  /** Records an exchange handled locally (e.g. a playback command) without calling the AI. */
+  const addLocalExchange = useCallback((userText: string, reply: string) => {
+    setError(null);
+    setMessages((prev) => [...prev, createMessage('user', userText.trim()), createMessage('assistant', reply)]);
+  }, []);
+
   return {
     messages,
     isLoading,
@@ -99,5 +106,6 @@ export function useChat() {
     clearConversation,
     newConversation,
     dismissError,
+    addLocalExchange,
   };
 }

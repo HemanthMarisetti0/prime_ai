@@ -15,11 +15,36 @@ export interface UserLocation {
   label?: string;
 }
 
+/** What the HUD's media player is doing, so the assistant can refer to it. */
+export interface MediaState {
+  title: string;
+  playing: boolean;
+}
+
 export interface ChatRequest {
   message: string;
   history: ChatMessage[];
   /** Sir's current location, used for weather when no place is named. */
   location?: UserLocation;
+  media?: MediaState;
+}
+
+export interface YouTubeVideo {
+  videoId: string;
+  title: string;
+  channel: string;
+  thumbnailUrl: string;
+  url: string;
+}
+
+export interface YouTubeResults {
+  query: string;
+  /** Always available, even without an API key. */
+  searchUrl: string;
+  /** Empty when no YouTube API key is configured. */
+  videos: YouTubeVideo[];
+  /** Start playing the first video straight away. */
+  autoplay: boolean;
 }
 
 export interface WeatherReport {
@@ -59,6 +84,7 @@ export interface ChatResponse {
   display?: ChatDisplay;
   weather?: WeatherReport;
   news?: NewsReport;
+  youtube?: YouTubeResults;
 }
 
 export interface HealthResponse {

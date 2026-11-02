@@ -11,6 +11,8 @@ export interface AppEnv {
   gemini: { apiKey: string; model: string };
   systemMonitor: boolean;
   newsRegion: string;
+  /** Optional: enables picking and embedding specific YouTube videos. */
+  youtubeApiKey: string;
   auth: {
     /** Empty disables authentication (development only). */
     firebaseProjectId: string;
@@ -41,6 +43,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     // A cloud server would report its own hardware, so telemetry defaults off in production.
     systemMonitor: flag(source.SYSTEM_MONITOR, !isProduction),
     newsRegion: (text(source.NEWS_REGION) || 'IN').toUpperCase(),
+    youtubeApiKey: text(source.YOUTUBE_API_KEY),
     auth: {
       firebaseProjectId: text(source.FIREBASE_PROJECT_ID),
       allowedEmails: list(source.ALLOWED_EMAILS).map((email) => email.toLowerCase()),
