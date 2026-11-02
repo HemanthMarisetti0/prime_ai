@@ -87,13 +87,16 @@ export function ChatInput({ onSend, isLoading, isSpeaking, onStopSpeaking, onVoi
   return (
     <form className="composer" onSubmit={handleSubmit}>
       <div className={`composer__field${speech.isListening ? ' composer__field--listening' : ''}`}>
+        <span className="composer__prompt" aria-hidden="true">
+          ›
+        </span>
         <textarea
           ref={inputRef}
           className="composer__input"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={speech.isListening ? 'Listening… speak now, Sir.' : 'Message P.R.I.M.E.…'}
+          placeholder={speech.isListening ? 'Listening… speak now, Sir.' : 'Awaiting your command, Sir…'}
           rows={1}
           maxLength={MAX_MESSAGE_LENGTH}
           readOnly={speech.isListening}

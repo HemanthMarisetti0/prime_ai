@@ -47,7 +47,7 @@ export function VoiceSettings({ voices, voice, onVoiceChange, rate, onRateChange
     <div className="settings" ref={rootRef}>
       <button
         type="button"
-        className={`btn btn--ghost${open ? ' is-active' : ''}`}
+        className={`hud-btn hud-btn--icon${open ? ' is-active' : ''}`}
         onClick={() => setOpen((o) => !o)}
         disabled={disabled}
         aria-expanded={open}
@@ -88,7 +88,7 @@ export function VoiceSettings({ voices, voice, onVoiceChange, rate, onRateChange
             />
           </label>
 
-          <button type="button" className="btn btn--outline settings__test" onClick={() => onTest(SAMPLE)}>
+          <button type="button" className="hud-btn settings__test" onClick={() => onTest(SAMPLE)}>
             Test voice
           </button>
           <p className="settings__note">"Online" / "Natural" voices sound most realistic and need internet.</p>

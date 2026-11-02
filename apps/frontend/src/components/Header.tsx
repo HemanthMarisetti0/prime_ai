@@ -1,85 +1,76 @@
 import type { ReactNode } from 'react';
+import { useClock } from '../hooks/useClock';
 import type { ServerStatus } from '../hooks/useServerStatus';
-import { HeadsetIcon, PlusIcon, TrashIcon, VolumeIcon, VolumeOffIcon } from './icons';
+import { PlusIcon, TrashIcon, VolumeIcon, VolumeOffIcon } from './icons';
 
-export type CoreState = ServerStatus | 'processing';
-
-const STATUS_LABEL: Record<CoreState, string> = {
-  checking: 'Connecting',
+const LINK_LABEL: Record<ServerStatus, string> = {
+  checking: 'Linking',
   online: 'Online',
   offline: 'Offline',
-  processing: 'Processing',
 };
 
 interface HeaderProps {
-  coreState: CoreState;
+  serverStatus: ServerStatus;
   voiceReplies: boolean;
   voiceSupported: boolean;
   onToggleVoiceReplies: () => void;
   voiceSettings: ReactNode;
-  handsFree: boolean;
-  handsFreeSupported: boolean;
-  onToggleHandsFree: () => void;
   onNewConversation: () => void;
   onClearConversation: () => void;
   canClear: boolean;
 }
 
 export function Header({
-  coreState,
+  serverStatus,
   voiceReplies,
   voiceSupported,
   onToggleVoiceReplies,
   voiceSettings,
-  handsFree,
-  handsFreeSupported,
-  onToggleHandsFree,
   onNewConversation,
   onClearConversation,
   canClear,
 }: HeaderProps) {
+  const now = useClock();
+  const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+  const date = now
+    .toLocaleDateString([], { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' })
+    .toUpperCase();
+
   const voiceTitle = !voiceSupported
     ? 'Spoken replies are not supported in this browser'
     : voiceReplies
       ? 'Spoken replies on'
       : 'Spoken replies off';
-  const handsFreeTitle = !handsFreeSupported
-    ? 'Hands-free mode needs Chrome or Edge'
-    : handsFree
-      ? 'End hands-free conversation'
-      : 'Start hands-free conversation';
 
   return (
-    <header className="header">
-      <div className="header__brand">
-        <div className={`core core--${coreState}`} aria-hidden="true">
-          <span className="core__ring" />
-          <span className="core__dot" />
+    <header className="topbar panel">
+      <div className="topbar__brand">
+        <h1 className="topbar__title">P.R.I.M.E.</h1>
+        <p className="topbar__subtitle">Personal Reasoning &amp; Intelligent Machine Engine</p>
+      </div>
+
+      <div className="topbar__readouts" aria-label="System readouts">
+        <div className="readout">
+          <span className="readout__label">Local time</span>
+          <span className="readout__value readout__value--clock">{time}</span>
         </div>
-        <div>
-          <h1 className="header__title">P.R.I.M.E.</h1>
-          <p className="header__subtitle">Personal Reasoning and Intelligent Machine Engine</p>
+        <div className="readout readout--date">
+          <span className="readout__label">Date</span>
+          <span className="readout__value">{date}</span>
+        </div>
+        <div className={`readout readout--link readout--${serverStatus}`} role="status">
+          <span className="readout__label">Link</span>
+          <span className="readout__value">
+            <span className="readout__dot" aria-hidden="true" />
+            {LINK_LABEL[serverStatus]}
+          </span>
         </div>
       </div>
 
-      <div className="header__actions">
-        <span className={`status status--${coreState}`} role="status">
-          {STATUS_LABEL[coreState]}
-        </span>
+      <div className="topbar__actions">
         <button
           type="button"
-          className={`btn ${handsFree ? 'btn--live' : 'btn--ghost'}`}
-          onClick={onToggleHandsFree}
-          disabled={!handsFreeSupported}
-          aria-pressed={handsFree}
-          title={handsFreeTitle}
-        >
-          <HeadsetIcon />
-          <span className="btn__label">Hands-free</span>
-        </button>
-        <button
-          type="button"
-          className={`btn btn--ghost${voiceReplies && voiceSupported ? ' is-active' : ''}`}
+          className={`hud-btn hud-btn--icon${voiceReplies && voiceSupported ? ' is-active' : ''}`}
           onClick={onToggleVoiceReplies}
           disabled={!voiceSupported}
           aria-pressed={voiceReplies}
@@ -91,17 +82,17 @@ export function Header({
         {voiceSettings}
         <button
           type="button"
-          className="btn btn--ghost"
+          className="hud-btn hud-btn--icon"
           onClick={onClearConversation}
           disabled={!canClear}
           title="Clear conversation"
+          aria-label="Clear conversation"
         >
           <TrashIcon />
-          <span className="btn__label">Clear</span>
         </button>
-        <button type="button" className="btn btn--outline" onClick={onNewConversation} title="New conversation">
+        <button type="button" className="hud-btn" onClick={onNewConversation} title="New conversation">
           <PlusIcon />
-          <span className="btn__label">New</span>
+          <span className="hud-btn__label">New</span>
         </button>
       </div>
     </header>

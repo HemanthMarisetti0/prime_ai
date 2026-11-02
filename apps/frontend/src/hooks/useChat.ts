@@ -4,6 +4,7 @@ import { sendChat } from '../api/chat';
 
 export interface UiMessage extends ChatMessage {
   id: string;
+  createdAt: number;
 }
 
 // Mirror the backend validation limits (apps/backend/src/ai/dto/chat-request.dto.ts).
@@ -12,7 +13,7 @@ const MAX_HISTORY_MESSAGES = 50;
 const MAX_HISTORY_CONTENT_LENGTH = MAX_MESSAGE_LENGTH * 4;
 
 function createMessage(role: ChatRole, content: string): UiMessage {
-  return { id: crypto.randomUUID(), role, content };
+  return { id: crypto.randomUUID(), role, content, createdAt: Date.now() };
 }
 
 function createGreeting(): UiMessage {

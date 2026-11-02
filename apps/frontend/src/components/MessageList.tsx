@@ -20,12 +20,13 @@ export function MessageList({ messages, isLoading }: MessageListProps) {
         <MessageBubble key={m.id} message={m} />
       ))}
       {isLoading && (
-        <div className="message message--assistant" aria-label="P.R.I.M.E. is thinking">
-          <span className="message__author">P.R.I.M.E.</span>
-          <div className="message__bubble typing">
-            <span />
-            <span />
-            <span />
+        <div className="message message--assistant" aria-label="P.R.I.M.E. is processing">
+          <div className="message__meta">
+            <span className="message__author">P.R.I.M.E.</span>
+          </div>
+          <div className="message__body processing">
+            <span className="processing__bar" />
+            <span className="processing__text">Processing</span>
           </div>
         </div>
       )}

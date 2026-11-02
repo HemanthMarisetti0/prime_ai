@@ -3,14 +3,23 @@ import { ChatInput } from './components/ChatInput';
 import { ErrorBanner } from './components/ErrorBanner';
 import { Header } from './components/Header';
 import { MessageList } from './components/MessageList';
+import { Reactor, type ReactorState } from './components/Reactor';
 import { VoiceSettings } from './components/VoiceSettings';
-import { HandsFreeBar } from './components/HandsFreeBar';
 import { useChat } from './hooks/useChat';
 import { useHandsFree } from './hooks/useHandsFree';
 import { useServerStatus } from './hooks/useServerStatus';
 import { useSpeechSynthesis } from './hooks/useSpeechSynthesis';
 
 const VOICE_REPLIES_KEY = 'prime.voiceReplies';
+
+const STATE_LABEL: Record<ReactorState, string> = {
+  connecting: 'Initialising',
+  offline: 'Offline',
+  standby: 'Standing by',
+  listening: 'Listening',
+  thinking: 'Processing',
+  speaking: 'Responding',
+};
 
 function loadVoiceReplies(): boolean {
   try {
@@ -83,10 +92,43 @@ export default function App() {
     onError: setVoiceError,
   });
 
-  const toggleHandsFree = () => {
+  const reactorState: ReactorState =
+    serverStatus === 'offline'
+      ? 'offline'
+      : handsFreeSession.phase === 'listening'
+        ? 'listening'
+        : chat.isLoading
+          ? 'thinking'
+          : speech.isSpeaking
+            ? 'speaking'
+            : serverStatus === 'checking'
+              ? 'connecting'
+              : 'standby';
+
+  // Tapping the core silences a reply outside voice mode; otherwise it toggles the voice link.
+  const activateCore = () => {
+    if (!handsFree && speech.isSpeaking) {
+      stopSpeaking();
+      return;
+    }
     setVoiceError(null);
     setHandsFree((on) => !on);
   };
+
+  const coreHint = (() => {
+    if (reactorState === 'offline') return 'Backend unreachable. Please check the server, Sir.';
+    if (!handsFreeSession.isSupported) return 'Voice link requires Chrome or Edge.';
+    if (reactorState === 'listening') return handsFreeSession.transcript || 'Speak now. Say “stop listening” to end.';
+    if (reactorState === 'thinking') return 'Analysing your request…';
+    if (reactorState === 'speaking') return handsFree ? 'Tap the core to end the voice link.' : 'Tap the core to silence.';
+    return handsFree ? 'Voice link engaged.' : 'Tap the core to talk.';
+  })();
+
+  const coreActionLabel = handsFree
+    ? 'End voice link'
+    : speech.isSpeaking
+      ? 'Stop speaking'
+      : 'Start voice link';
 
   const errorMessage = chat.error ?? voiceError;
   const handleDismissError = () => {
@@ -94,10 +136,12 @@ export default function App() {
     setVoiceError(null);
   };
 
+  const exchangeCount = chat.messages.length;
+
   return (
-    <div className="app">
+    <div className="hud">
       <Header
-        coreState={chat.isLoading ? 'processing' : serverStatus}
+        serverStatus={serverStatus}
         voiceReplies={voiceReplies}
         voiceSupported={speech.isSupported}
         onToggleVoiceReplies={toggleVoiceReplies}
@@ -112,32 +156,49 @@ export default function App() {
             disabled={!speech.isSupported}
           />
         }
-        handsFree={handsFree}
-        handsFreeSupported={handsFreeSession.isSupported}
-        onToggleHandsFree={toggleHandsFree}
         onNewConversation={handleNew}
         onClearConversation={handleClear}
         canClear={chat.messages.length > 1 || chat.isLoading}
       />
-      <main className="chat">
-        <MessageList messages={chat.messages} isLoading={chat.isLoading} />
-        {errorMessage && <ErrorBanner message={errorMessage} onDismiss={handleDismissError} />}
-        {handsFreeSession.phase !== 'off' && (
-          <HandsFreeBar
-            phase={handsFreeSession.phase}
-            transcript={handsFreeSession.transcript}
-            onEnd={() => setHandsFree(false)}
+
+      <main className="hud__body">
+        <section className={`core-panel panel core-panel--${reactorState}`} aria-label="Assistant core">
+          <div className="core-panel__scan" aria-hidden="true" />
+          <Reactor
+            state={reactorState}
+            active={handsFree}
+            disabled={!handsFreeSession.isSupported && !speech.isSpeaking}
+            label={coreActionLabel}
+            onActivate={activateCore}
           />
-        )}
-        <ChatInput
-          key={chat.conversationId}
-          onSend={handleSend}
-          isLoading={chat.isLoading}
-          isSpeaking={speech.isSpeaking}
-          onStopSpeaking={stopSpeaking}
-          onVoiceError={setVoiceError}
-          micDisabled={handsFree}
-        />
+          <div className="core-panel__readout">
+            <p className="core-panel__state">{STATE_LABEL[reactorState]}</p>
+            <p className="core-panel__hint" aria-live="polite">
+              {coreHint}
+            </p>
+            <p className={`core-panel__link${handsFree ? ' is-on' : ''}`}>
+              Voice link · {handsFree ? 'Engaged' : 'Standby'}
+            </p>
+          </div>
+        </section>
+
+        <section className="comms panel" aria-label="Conversation">
+          <div className="comms__header">
+            <span>Comms log</span>
+            <span className="comms__count">{String(exchangeCount).padStart(2, '0')} entries</span>
+          </div>
+          <MessageList messages={chat.messages} isLoading={chat.isLoading} />
+          {errorMessage && <ErrorBanner message={errorMessage} onDismiss={handleDismissError} />}
+          <ChatInput
+            key={chat.conversationId}
+            onSend={handleSend}
+            isLoading={chat.isLoading}
+            isSpeaking={speech.isSpeaking}
+            onStopSpeaking={stopSpeaking}
+            onVoiceError={setVoiceError}
+            micDisabled={handsFree}
+          />
+        </section>
       </main>
     </div>
   );
