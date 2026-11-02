@@ -136,6 +136,8 @@ export type ChatDisplay = 'system';
 
 export interface ChatResponse {
   reply: string;
+  /** Gemini model that produced the reply (may be a fallback). */
+  model?: string;
   display?: ChatDisplay;
   weather?: WeatherReport;
   news?: NewsReport;

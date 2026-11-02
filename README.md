@@ -86,7 +86,8 @@ Each app has one settings file per environment. Real files are git-ignored; copy
 |---|---|---|---|
 | `NODE_ENV` | | `development` | `production` enables strict validation and production defaults |
 | `GEMINI_API_KEY` | prod | | Gemini API key (secret) |
-| `GEMINI_MODEL` | | `gemini-2.5-flash` | Any Gemini model; quotas are per model |
+| `GEMINI_MODEL` | | `gemini-2.5-flash` | Preferred Gemini model |
+| `GEMINI_FALLBACK_MODELS` | | built-in list | Comma-separated models tried in order when one hits its limit or is unavailable; `none` disables fallback |
 | `PORT` | | `3000` | HTTP port |
 | `FIREBASE_PROJECT_ID` | prod | | Enables sign-in; empty disables it (development only) |
 | `ALLOWED_EMAILS` | prod | | Comma-separated Google accounts allowed in |
@@ -183,7 +184,7 @@ Short, explicit playback and PC commands run instantly in the browser/backend wi
 
 ## Limitations
 
-- **Gemini free tier**: about 5 requests per minute and a small daily cap per model. Weather, news, YouTube, directions and trip questions use 2–3 requests each. Switch `GEMINI_MODEL` if one model's daily quota runs out.
+- **Gemini free tier**: about 5 requests per minute and a small daily cap per model. Weather, news, YouTube, directions and trip questions use 2–3 requests each. When a model hits its limit (or is overloaded or unavailable), P.R.I.M.E. switches to the next model in `GEMINI_FALLBACK_MODELS` (default: `gemini-2.5-flash-lite`, `gemini-3.5-flash-lite`, `gemini-3.1-flash-lite`, `gemini-3.5-flash`, `gemini-2.5-flash`) and rests the exhausted one for the time Google reports. Each reply shows the model that answered. Only when every model is resting does it ask you to wait.
 - **Browser speech**: voice input and the wake word need Chrome or Edge, send audio to the browser's speech service and only work while the tab is open. iPhone Safari is unreliable for hands-free use.
 - **HTTPS**: microphone and location need `localhost` or HTTPS, so other devices need an HTTPS address.
 - **Phones**: the web app cannot change a phone's system volume or read its CPU/RAM/storage; PC diagnostics and control always refer to the machine running the backend.

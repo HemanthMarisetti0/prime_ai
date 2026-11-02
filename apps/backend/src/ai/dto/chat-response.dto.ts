@@ -11,6 +11,7 @@ import type {
 
 export class ChatResponseDto implements ChatResponse {
   reply: string;
+  model?: string;
   display?: ChatDisplay;
   weather?: WeatherReport;
   news?: NewsReport;

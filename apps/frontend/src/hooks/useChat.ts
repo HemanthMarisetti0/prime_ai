@@ -16,6 +16,8 @@ import type { AttachedImage } from '../media/image';
 export interface UiMessage extends ChatMessage {
   id: string;
   createdAt: number;
+  /** Gemini model that answered (may be a fallback). */
+  model?: string;
   /** HUD panel the reply asked to show (e.g. system diagnostics). */
   display?: ChatDisplay;
   weather?: WeatherReport;

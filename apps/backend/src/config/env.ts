@@ -8,7 +8,8 @@ export interface AppEnv {
   isProduction: boolean;
   port: number;
   corsOrigins: string[];
-  gemini: { apiKey: string; model: string };
+  /** `model` is preferred; `fallbackModels` are tried in order when it hits a limit or is unavailable. */
+  gemini: { apiKey: string; model: string; fallbackModels: string[] };
   systemMonitor: boolean;
   /** Control of the host PC (currently: Windows system volume). */
   pcControl: boolean;
@@ -22,6 +23,14 @@ export interface AppEnv {
     allowedEmails: string[];
   };
 }
+
+const DEFAULT_FALLBACK_MODELS = [
+  'gemini-2.5-flash-lite',
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-3.5-flash',
+  'gemini-2.5-flash',
+];
 
 const text = (value: string | undefined) => value?.trim() ?? '';
 const list = (value: string | undefined) =>
@@ -50,7 +59,17 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     isProduction,
     port: Number(source.PORT) || 3000,
     corsOrigins: list(source.CORS_ORIGIN).map(origin),
-    gemini: { apiKey: text(source.GEMINI_API_KEY), model: text(source.GEMINI_MODEL) || 'gemini-2.5-flash' },
+    gemini: {
+      apiKey: text(source.GEMINI_API_KEY),
+      model: text(source.GEMINI_MODEL) || 'gemini-2.5-flash',
+      // Free-tier quotas are per model, so other models keep P.R.I.M.E. working when one runs out.
+      fallbackModels:
+        text(source.GEMINI_FALLBACK_MODELS).toLowerCase() === 'none'
+          ? []
+          : list(source.GEMINI_FALLBACK_MODELS).length
+            ? list(source.GEMINI_FALLBACK_MODELS)
+            : DEFAULT_FALLBACK_MODELS,
+    },
     // A cloud server would report its own hardware, so telemetry defaults off in production.
     systemMonitor: flag(source.SYSTEM_MONITOR, !isProduction),
     // Only meaningful when the backend runs on Sir's own Windows PC.

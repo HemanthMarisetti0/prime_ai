@@ -2548,3 +2548,12 @@ select {
     align-items: center;
   }
 }
+
+.message__model {
+  margin-left: auto;
+  padding: 0 6px;
+  border: 1px solid var(--line);
+  color: var(--text-faint);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+}

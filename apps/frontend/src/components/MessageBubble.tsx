@@ -11,6 +11,11 @@ export function MessageBubble({ message }: { message: UiMessage }) {
       <div className="message__meta">
         <span className="message__author">{isUser ? 'You' : 'P.R.I.M.E.'}</span>
         <span className="message__time">{formatTime(message.createdAt)}</span>
+        {message.model && (
+          <span className="message__model" title={`Answered by ${message.model}`}>
+            {message.model.replace(/^gemini-/, "")}
+          </span>
+        )}
       </div>
       <div className="message__body">
         {message.imageUrl && <img className="message__image" src={message.imageUrl} alt="Attached by you" />}

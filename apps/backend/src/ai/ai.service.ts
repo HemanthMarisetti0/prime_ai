@@ -39,6 +39,7 @@ import { GeoService } from '../tools/geo.service';
 import { NewsService } from '../tools/news.service';
 import { WeatherService } from '../tools/weather.service';
 import { YouTubeService } from '../tools/youtube.service';
+import { classifyModelError, ModelPool } from './model-pool';
 import { buildSystemInstruction, SYSTEM_DISPLAY_TAG } from './prime.persona';
 
 const REQUEST_TIMEOUT_MS = 45_000;
@@ -276,7 +277,7 @@ const DISPLAY_TAG_PATTERN = new RegExp(`\\s*${escapeRegExp(SYSTEM_DISPLAY_TAG)}\
 @Injectable()
 export class AiService {
   private readonly logger = new Logger(AiService.name);
-  private readonly model = env.gemini.model;
+  private readonly pool = new ModelPool([env.gemini.model, ...env.gemini.fallbackModels]);
   private readonly client: GoogleGenAI | null;
   private readonly tools: FunctionDeclaration[];
 
@@ -299,6 +300,7 @@ export class AiService {
     this.client = apiKey
       ? new GoogleGenAI({ apiKey, httpOptions: { timeout: REQUEST_TIMEOUT_MS } })
       : null;
+    this.logger.log(`Gemini models (in order of preference): ${this.pool.models.join(', ')}`);
   }
 
   async chat(message: string, history: ChatMessage[], context: ChatContext = {}): Promise<ChatResponse> {
@@ -314,10 +316,31 @@ export class AiService {
     const contents = toGeminiContents(message, history, context.image);
     const results: ToolResults = {};
 
+    // Models not resting after earlier limits, in preference order.
+    const candidates = this.pool.available();
+    let model = candidates.shift();
+    if (!model) throw this.allModelsResting();
+
     try {
       let raw = '';
       for (let round = 0; ; round++) {
-        const response = await this.generateWithRetry({ model: this.model, contents, config });
+        let response;
+        for (;;) {
+          try {
+            response = await this.generateWithRetry({ model, contents, config });
+            break;
+          } catch (error) {
+            const verdict = classifyModelError(error);
+            if (!verdict) throw error;
+            this.pool.rest(model, verdict.restSeconds);
+            const next = candidates.shift();
+            if (!next) throw this.pool.available().length ? error : this.allModelsResting();
+            this.logger.warn(`${model} ${verdict.reason}; switching to ${next}`);
+            // A different model can't validate the previous model's thought signatures.
+            if (round > 0) neutraliseThoughtSignatures(contents);
+            model = next;
+          }
+        }
         const calls = response.functionCalls ?? [];
         if (!calls.length || round === MAX_TOOL_ROUNDS) {
           raw = response.text?.trim() ?? '';
@@ -341,10 +364,27 @@ export class AiService {
       }
 
       const showSystem = Boolean(telemetry) && (tagged || SYSTEM_QUESTION.test(message));
-      return { reply, ...(showSystem && { display: 'system' as const }), ...results };
+      return { reply, model, ...(showSystem && { display: 'system' as const }), ...results };
     } catch (error) {
       throw this.toHttpException(error);
     }
+  }
+
+  /** Every model is resting after hitting its limits. */
+  private allModelsResting(): HttpException {
+    const seconds = this.pool.secondsUntilNextAvailable();
+    const wait =
+      seconds === null
+        ? 'later'
+        : seconds < 90
+          ? `in about ${Math.max(seconds, 5)} seconds`
+          : seconds < 2 * 3600
+            ? `in about ${Math.ceil(seconds / 60)} minutes`
+            : `in about ${Math.round(seconds / 3600)} hours`;
+    return new HttpException(
+      `My apologies, Sir. All of my free AI models have reached their limits for now. Kindly try again ${wait}.`,
+      HttpStatus.TOO_MANY_REQUESTS,
+    );
   }
 
   /** One retry for transient Gemini failures (overloaded, deadline exceeded, dropped connection). */
@@ -496,7 +536,7 @@ export class AiService {
         case 429: {
           if (/PerDay/i.test(error.message)) {
             return new HttpException(
-              `My apologies, Sir. Today's free allowance for ${this.model} has been used up. It resets tomorrow, or another model can be set in GEMINI_MODEL.`,
+              "My apologies, Sir. Today's free allowance for my available AI models has been used up. It resets tomorrow.",
               HttpStatus.TOO_MANY_REQUESTS,
             );
           }
@@ -525,6 +565,18 @@ export class AiService {
 
     this.logger.error('Unexpected error calling Gemini', error instanceof Error ? error.stack : String(error));
     return new BadGatewayException('My apologies, Sir. I am unable to reach my AI provider just now. Please try again.');
+  }
+}
+
+// Documented placeholder that tells Gemini to skip thought-signature validation for turns
+// produced by another model (used only after switching models mid-request).
+const SKIP_SIGNATURE = 'skip_thought_signature_validator';
+
+function neutraliseThoughtSignatures(contents: Content[]) {
+  for (const content of contents) {
+    for (const part of content.parts ?? []) {
+      if (part.thoughtSignature) part.thoughtSignature = SKIP_SIGNATURE;
+    }
   }
 }
 
