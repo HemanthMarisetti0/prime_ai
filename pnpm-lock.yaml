@@ -199,6 +199,9 @@ importers:
       rxjs:
         specifier: ^7.8.2
         version: 7.8.2
+      systeminformation:
+        specifier: ^5.33.19
+        version: 5.33.19
     devDependencies:
       '@types/express':
         specifier: ^5.0.6
@@ -1140,6 +1143,12 @@ packages:
     resolution: {integrity: sha512-MD8mENgyXMr2mDaDfzP3RWYDSyYQxIIou7HhCiCJiBekrsoDtUG0id3vYnjDfY9ndOEbazFXe13Qw6u/1AB8ew==}
     engines: {node: '>=18'}
 
+  systeminformation@5.33.19:
+    resolution: {integrity: sha512-Zm7wGeCG7PqfvzegMJIzrxICopWqYCeLATVmvxOOci1isLcNVKgY4Fr0hhYQzvc7cgtK3377jQVChTFAnznOiA==}
+    engines: {node: '>=10.0.0'}
+    os: [darwin, linux, win32, freebsd, openbsd, netbsd, sunos, android]
+    hasBin: true
+
   tinyglobby@0.2.17:
     resolution: {integrity: sha512-wXR/dYpcqKmfWpEdZjiKJOwCNFndD0DMnrW/cYjVGttEkBfVgcLFHoNrlj47mjOVic9yyNu65alsgF4NQyTa2g==}
     engines: {node: '>=12.0.0'}
@@ -2072,6 +2081,8 @@ snapshots:
   strtok3@10.6.3:
     dependencies:
       '@tokenizer/token': 0.3.0
+
+  systeminformation@5.33.19: {}
 
   tinyglobby@0.2.17:
     dependencies:

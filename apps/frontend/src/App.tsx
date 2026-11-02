@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ChatInput } from './components/ChatInput';
+import { DiagnosticsPanel } from './components/DiagnosticsPanel';
 import { ErrorBanner } from './components/ErrorBanner';
 import { Header } from './components/Header';
 import { MessageList } from './components/MessageList';
@@ -9,6 +10,7 @@ import { useChat } from './hooks/useChat';
 import { useHandsFree } from './hooks/useHandsFree';
 import { useServerStatus } from './hooks/useServerStatus';
 import { useSpeechSynthesis } from './hooks/useSpeechSynthesis';
+import { useSystemStats } from './hooks/useSystemStats';
 
 const VOICE_REPLIES_KEY = 'prime.voiceReplies';
 
@@ -33,6 +35,7 @@ export default function App() {
   const chat = useChat();
   const serverStatus = useServerStatus(chat.error);
   const speech = useSpeechSynthesis();
+  const systemStats = useSystemStats();
   const [voiceReplies, setVoiceReplies] = useState(loadVoiceReplies);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const lastHandledReplyRef = useRef<string | null>(null);
@@ -162,6 +165,7 @@ export default function App() {
       />
 
       <main className="hud__body">
+        <div className="hud__left">
         <section className={`core-panel panel core-panel--${reactorState}`} aria-label="Assistant core">
           <div className="core-panel__scan" aria-hidden="true" />
           <Reactor
@@ -181,6 +185,12 @@ export default function App() {
             </p>
           </div>
         </section>
+        <DiagnosticsPanel
+          snapshot={systemStats}
+          canRun={!chat.isLoading}
+          onRunDiagnostics={() => void handleSend('Run a full system diagnostic.')}
+        />
+        </div>
 
         <section className="comms panel" aria-label="Conversation">
           <div className="comms__header">

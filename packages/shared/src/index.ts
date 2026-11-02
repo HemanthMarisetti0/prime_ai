@@ -22,6 +22,17 @@ export interface HealthResponse {
   timestamp: string;
 }
 
+export interface SystemSnapshot {
+  capturedAt: string;
+  os: { name: string; build: string; arch: string; uptimeSeconds: number };
+  cpu: { model: string; physicalCores: number | null; threads: number; loadPercent: number | null; temperatureC: number | null };
+  memory: { totalBytes: number; usedBytes: number; usedPercent: number };
+  disks: { mount: string; totalBytes: number; usedBytes: number; usedPercent: number }[];
+  gpus: { model: string; vramMB: number | null; temperatureC: number | null }[];
+  battery: { present: boolean; percent: number | null; charging: boolean | null; pluggedIn: boolean | null; minutesRemaining: number | null };
+  backend: { nodeVersion: string; memoryMB: number };
+}
+
 export interface ApiErrorResponse {
   statusCode: number;
   message: string | string[];

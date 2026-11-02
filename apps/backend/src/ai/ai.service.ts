@@ -9,7 +9,8 @@ import {
 } from '@nestjs/common';
 import { ApiError, GoogleGenAI, type Content } from '@google/genai';
 import type { ChatMessage } from '@prime/shared';
-import { PRIME_SYSTEM_INSTRUCTION } from './prime.persona';
+import { describeSnapshot, SystemService } from '../system/system.service';
+import { buildSystemInstruction } from './prime.persona';
 
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -20,7 +21,7 @@ export class AiService {
   private readonly model = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
   private readonly client: GoogleGenAI | null;
 
-  constructor() {
+  constructor(private readonly systemService: SystemService) {
     const apiKey = process.env.GEMINI_API_KEY?.trim();
     if (!apiKey) {
       this.logger.warn('GEMINI_API_KEY is not set; /api/chat will return 503.');
@@ -35,11 +36,13 @@ export class AiService {
       throw new ServiceUnavailableException('AI provider is not configured.');
     }
 
+    const systemInstruction = buildSystemInstruction(await this.getTelemetry());
+
     try {
       const response = await this.client.models.generateContent({
         model: this.model,
         contents: toGeminiContents(message, history),
-        config: { systemInstruction: PRIME_SYSTEM_INSTRUCTION },
+        config: { systemInstruction },
       });
 
       const reply = response.text?.trim();
@@ -49,6 +52,16 @@ export class AiService {
       return reply;
     } catch (error) {
       throw this.toHttpException(error);
+    }
+  }
+
+  private async getTelemetry(): Promise<string | null> {
+    if (!this.systemService.enabled) return null;
+    try {
+      return describeSnapshot(await this.systemService.getSnapshot());
+    } catch (error) {
+      this.logger.warn(`Telemetry unavailable: ${error instanceof Error ? error.message : String(error)}`);
+      return null;
     }
   }
 
