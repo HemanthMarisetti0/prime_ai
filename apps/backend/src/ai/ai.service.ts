@@ -13,11 +13,15 @@ import type {
   ChatResponse,
   MediaState,
   NewsReport,
+  SystemVolumeAction,
   UserLocation,
   WeatherReport,
   YouTubeResults,
 } from '@prime/shared';
 import { env } from '../config/env';
+import { VOLUME_ACTIONS } from '../pc/dto/volume-request.dto';
+import { toVolumeAction } from '../pc/volume-action';
+import { VolumeService } from '../pc/volume.service';
 import { describeSnapshot, SystemService } from '../system/system.service';
 import { NewsService } from '../tools/news.service';
 import { WeatherService } from '../tools/weather.service';
@@ -68,6 +72,25 @@ const TOOLS: FunctionDeclaration[] = [
   },
 ];
 
+const SYSTEM_VOLUME_TOOL: FunctionDeclaration = {
+  name: 'set_system_volume',
+  description:
+    "Read or change the Windows system (master) volume of Sir's computer. Not for the YouTube player, which Sir's display controls directly.",
+  parametersJsonSchema: {
+    type: 'object',
+    properties: {
+      action: { type: 'string', enum: ['get', 'set', 'up', 'down', 'mute', 'unmute'] },
+      level: {
+        type: 'integer',
+        minimum: 0,
+        maximum: 100,
+        description: 'Target percentage for "set", or the step size for "up"/"down" (default 10).',
+      },
+    },
+    required: ['action'],
+  },
+};
+
 interface ToolResults {
   weather?: WeatherReport;
   news?: NewsReport;
@@ -88,13 +111,16 @@ export class AiService {
   private readonly logger = new Logger(AiService.name);
   private readonly model = env.gemini.model;
   private readonly client: GoogleGenAI | null;
+  private readonly tools: FunctionDeclaration[];
 
   constructor(
     private readonly systemService: SystemService,
     private readonly weatherService: WeatherService,
     private readonly newsService: NewsService,
     private readonly youtubeService: YouTubeService,
+    private readonly volumeService: VolumeService,
   ) {
+    this.tools = volumeService.enabled ? [...TOOLS, SYSTEM_VOLUME_TOOL] : TOOLS;
     const { apiKey } = env.gemini;
     if (!apiKey) {
       this.logger.warn('GEMINI_API_KEY is not set; /api/chat will return 503.');
@@ -111,8 +137,8 @@ export class AiService {
 
     const telemetry = await this.getTelemetry();
     const config = {
-      systemInstruction: buildSystemInstruction(telemetry, context.media),
-      tools: [{ functionDeclarations: TOOLS }],
+      systemInstruction: buildSystemInstruction(telemetry, context.media, this.volumeService.enabled),
+      tools: [{ functionDeclarations: this.tools }],
     };
     const contents = toGeminiContents(message, history);
     const results: ToolResults = {};
@@ -163,6 +189,13 @@ export class AiService {
         case 'get_weather':
           results.weather = await this.weatherService.getWeather(text(args.location), context.location);
           return { output: results.weather };
+        case 'set_system_volume': {
+          const action = text(args.action) as SystemVolumeAction | undefined;
+          if (!action || !VOLUME_ACTIONS.includes(action)) return { error: 'Unknown volume action.' };
+          const level = typeof args.level === 'number' ? Math.round(Math.max(0, Math.min(100, args.level))) : undefined;
+          const volume = await this.volumeService.run(toVolumeAction(action, level));
+          return { output: { systemVolumePercent: volume.percent, muted: volume.muted } };
+        }
         case 'search_youtube': {
           const query = text(args.query)?.trim();
           if (!query) return { error: 'A search query is required.' };

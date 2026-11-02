@@ -10,6 +10,8 @@ export interface AppEnv {
   corsOrigins: string[];
   gemini: { apiKey: string; model: string };
   systemMonitor: boolean;
+  /** Control of the host PC (currently: Windows system volume). */
+  pcControl: boolean;
   newsRegion: string;
   /** Optional: enables picking and embedding specific YouTube videos. */
   youtubeApiKey: string;
@@ -42,6 +44,8 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     gemini: { apiKey: text(source.GEMINI_API_KEY), model: text(source.GEMINI_MODEL) || 'gemini-2.5-flash' },
     // A cloud server would report its own hardware, so telemetry defaults off in production.
     systemMonitor: flag(source.SYSTEM_MONITOR, !isProduction),
+    // Only meaningful when the backend runs on Sir's own Windows PC.
+    pcControl: flag(source.PC_CONTROL, !isProduction) && process.platform === 'win32',
     newsRegion: (text(source.NEWS_REGION) || 'IN').toUpperCase(),
     youtubeApiKey: text(source.YOUTUBE_API_KEY),
     auth: {

@@ -103,6 +103,19 @@ export interface SystemSnapshot {
   backend: { nodeVersion: string; memoryMB: number };
 }
 
+export type SystemVolumeAction = 'get' | 'set' | 'up' | 'down' | 'mute' | 'unmute';
+
+export interface SystemVolumeRequest {
+  action: SystemVolumeAction;
+  /** Target level for "set", or step size for "up"/"down" (0-100). */
+  level?: number;
+}
+
+export interface SystemVolume {
+  percent: number;
+  muted: boolean;
+}
+
 export interface ApiErrorResponse {
   statusCode: number;
   message: string | string[];

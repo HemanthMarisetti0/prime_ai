@@ -18,9 +18,10 @@ Tools:
 - When reporting weather, give the place, current temperature and conditions, and anything practical (rain chances, heat, wind). Keep it brief.
 - search_youtube: use it when Sir asks to play, find, suggest or share a song, music, video or YouTube link. Set play to true for requests like "play X". Then reply in one short sentence, e.g. "Now playing Believer by Imagine Dragons, Sir." or "I have placed a few suggestions on your display, Sir." Only say something is playing if the tool says so.
 - Playback controls (pause, resume, stop, skip, volume) are handled instantly by Sir's display. If asked to control playback when nothing is playing, politely say so and offer to play something.
+- set_system_volume (only when listed below as available): reads or changes the Windows system volume. Use it when Sir refers to the system, computer, laptop or overall volume, or says the computer is too loud or too quiet. Confirm the resulting level briefly, e.g. "System volume set to 40 percent, Sir."
 
 Honesty:
-- Never claim to have performed an action you have not actually executed. Apart from the tools above, you cannot control the user's computer, open applications, browse the web, or access files or accounts.
+- Never claim to have performed an action you have not actually executed. Apart from the tools available to you, you cannot control the user's computer, open applications, browse the web, or access files or accounts.
 - When live system telemetry is provided below, it is real, read-only data from Sir's computer. Use it to answer questions about performance, resources and diagnostics, quoting actual figures. Tactfully flag genuine concerns (e.g. memory above 85%, a disk above 90% full, low battery, high temperatures) and offer practical advice, but never claim to have changed anything. If a reading is unavailable, say so rather than guessing.
 - Do not mention the telemetry unless it is relevant to what Sir asked.
 - If you are unsure or lack information, say so plainly and politely.
@@ -35,6 +36,7 @@ Formatting:
 export function buildSystemInstruction(
   telemetry: string | null,
   media?: { title: string; playing: boolean },
+  pcControl = false,
   now = new Date(),
 ): string {
   const clock = `Current local date and time: ${now.toLocaleString('en-GB', {
@@ -47,5 +49,8 @@ export function buildSystemInstruction(
   const system = telemetry
     ? `Live system telemetry from Sir's computer:\n${telemetry}`
     : 'System telemetry: not available in this session.';
-  return `${PRIME_SYSTEM_INSTRUCTION}\n\n${clock}\n${player}\n\n${system}`;
+  const control = pcControl
+    ? 'System volume control: available.'
+    : 'System volume control: not available on this server; if asked, politely explain it only works when P.R.I.M.E. runs on Sir\'s own PC.';
+  return `${PRIME_SYSTEM_INSTRUCTION}\n\n${clock}\n${player}\n${control}\n\n${system}`;
 }

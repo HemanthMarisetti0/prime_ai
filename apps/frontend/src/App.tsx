@@ -10,7 +10,9 @@ import { Reactor, type ReactorState } from './components/Reactor';
 import { VoiceSettings } from './components/VoiceSettings';
 import { WeatherPanel } from './components/WeatherPanel';
 import { VOLUME_STEP, YouTubePanel, type MediaControls, type MediaSession } from './components/YouTubePanel';
+import { PcControlError, setSystemVolume } from './api/pc';
 import { parseMediaCommand, type MediaCommand } from './media/commands';
+import { describeVolumeResult, parseSystemVolumeCommand } from './pc/volumeCommands';
 import { useChat } from './hooks/useChat';
 import { useGeolocation } from './hooks/useGeolocation';
 import { useHandsFree } from './hooks/useHandsFree';
@@ -158,6 +160,21 @@ export default function App({ account, onSignOut }: AppProps) {
       if (command && mediaSession) {
         addLocalExchange(text, runMediaCommand(command, mediaSession));
         return true;
+      }
+
+      // Explicit system-volume commands go straight to the backend; if PC control is off, the AI explains.
+      const volumeRequest = parseSystemVolumeCommand(text);
+      if (volumeRequest) {
+        try {
+          const result = await setSystemVolume(volumeRequest);
+          addLocalExchange(text, describeVolumeResult(volumeRequest.action, result));
+          return true;
+        } catch (error) {
+          if (!(error instanceof PcControlError) || !error.unavailable) {
+            addLocalExchange(text, error instanceof Error ? error.message : 'My apologies, Sir. That did not work.');
+            return true;
+          }
+        }
       }
 
       // Ask for location only once weather comes up; afterwards it is reused for the session.
