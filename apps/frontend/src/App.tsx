@@ -3,13 +3,16 @@ import { ErrorBanner } from './components/ErrorBanner';
 import { Header } from './components/Header';
 import { MessageList } from './components/MessageList';
 import { useChat } from './hooks/useChat';
+import { useServerStatus } from './hooks/useServerStatus';
 
 export default function App() {
   const chat = useChat();
+  const serverStatus = useServerStatus(chat.error);
 
   return (
     <div className="app">
       <Header
+        coreState={chat.isLoading ? 'processing' : serverStatus}
         onNewConversation={chat.newConversation}
         onClearConversation={chat.clearConversation}
         canClear={chat.messages.length > 1 || chat.isLoading}

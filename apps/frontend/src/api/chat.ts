@@ -1,7 +1,5 @@
 import type { ApiErrorResponse, ChatMessage, ChatRequest, ChatResponse } from '@prime/shared';
-
-// Empty in development (Vite proxies /api); set VITE_API_URL when the backend is hosted elsewhere.
-const API_BASE = (import.meta.env.VITE_API_URL ?? '').replace(/\/$/, '');
+import { API_BASE } from './config';
 
 const UNREACHABLE = 'Unable to reach the P.R.I.M.E. server. Please check that the backend is running.';
 
