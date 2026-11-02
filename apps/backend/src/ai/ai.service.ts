@@ -56,13 +56,16 @@ export class AiService {
     if (error instanceof HttpException) return error;
 
     if (error instanceof ApiError) {
-      this.logger.error(`Gemini API error ${error.status}: ${error.message}`);
+      this.logger.error(`Gemini API error ${error.status}: ${error.message.slice(0, 300)}`);
       switch (error.status) {
-        case 429:
+        case 429: {
+          const retrySeconds = Number(/retry in ([\d.]+)s/i.exec(error.message)?.[1]);
+          const wait = retrySeconds > 0 ? `about ${Math.ceil(retrySeconds)} seconds` : 'a moment';
           return new HttpException(
-            'Rate limit reached. Please wait a moment and try again.',
+            `Rate limit reached. Please try again in ${wait}.`,
             HttpStatus.TOO_MANY_REQUESTS,
           );
+        }
         case 400:
         case 401:
         case 403:

@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
@@ -13,10 +13,13 @@ import type { ChatMessage, ChatRequest, ChatRole } from '@prime/shared';
 export const MAX_MESSAGE_LENGTH = 4000;
 export const MAX_HISTORY_MESSAGES = 50;
 
+const trim = ({ value }: { value: unknown }) => (typeof value === 'string' ? value.trim() : value);
+
 export class ChatMessageDto implements ChatMessage {
   @IsIn(['user', 'assistant'])
   role: ChatRole;
 
+  @Transform(trim)
   @IsString()
   @IsNotEmpty()
   @MaxLength(MAX_MESSAGE_LENGTH * 4)
@@ -24,6 +27,7 @@ export class ChatMessageDto implements ChatMessage {
 }
 
 export class ChatRequestDto implements ChatRequest {
+  @Transform(trim)
   @IsString()
   @IsNotEmpty()
   @MaxLength(MAX_MESSAGE_LENGTH)
