@@ -59,6 +59,12 @@ export class AiService {
       this.logger.error(`Gemini API error ${error.status}: ${error.message.slice(0, 300)}`);
       switch (error.status) {
         case 429: {
+          if (/PerDay/i.test(error.message)) {
+            return new HttpException(
+              `The daily free-tier limit for ${this.model} has been reached. Try again tomorrow or switch GEMINI_MODEL.`,
+              HttpStatus.TOO_MANY_REQUESTS,
+            );
+          }
           const retrySeconds = Number(/retry in ([\d.]+)s/i.exec(error.message)?.[1]);
           const wait = retrySeconds > 0 ? `about ${Math.ceil(retrySeconds)} seconds` : 'a moment';
           return new HttpException(
