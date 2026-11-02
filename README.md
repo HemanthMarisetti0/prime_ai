@@ -152,6 +152,12 @@ Notes:
 - The build uses `pnpm install --prod=false` because `NODE_ENV=production` also applies at build time.
 - `.node-version` pins Node 24.
 
+## Hosting the frontend on Vercel
+
+`vercel.json` (at the repo root and in `apps/frontend`, whichever is the Vercel project's Root Directory) proxies `/api/*` to the Render backend and serves `index.html` for other paths. With the proxy, `VITE_API_URL` can stay empty and the browser never makes cross-origin calls. If you change the backend URL, update the `destination` in `vercel.json`.
+
+Add the Vercel domain (e.g. `primeai1.vercel.app`) to Firebase **Authorized domains**.
+
 ## Things to say
 
 | Category | Examples |
