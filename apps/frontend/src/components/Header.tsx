@@ -1,7 +1,8 @@
 import type { ReactNode } from 'react';
 import { useClock } from '../hooks/useClock';
 import type { ServerStatus } from '../hooks/useServerStatus';
-import { ActivityIcon, LogoutIcon, PlusIcon, TrashIcon, VolumeIcon, VolumeOffIcon } from './icons';
+import type { WakeWordStatus } from '../hooks/useWakeWord';
+import { ActivityIcon, EarIcon, LogoutIcon, PlusIcon, TrashIcon, VolumeIcon, VolumeOffIcon } from './icons';
 
 export interface Account {
   name: string;
@@ -28,7 +29,17 @@ interface HeaderProps {
   onToggleDiagnostics: () => void;
   account: Account | null;
   onSignOut: () => void;
+  wakeStatus: WakeWordStatus;
+  onToggleWakeWord: () => void;
 }
+
+const WAKE_TITLE: Record<WakeWordStatus, string> = {
+  off: 'Wake word off: click to listen for “Hey Prime”',
+  armed: 'Listening for “Hey Prime”: click to turn off',
+  paused: 'Wake word on (paused while busy): click to turn off',
+  blocked: 'Wake word needs microphone access: allow it in the browser',
+  unsupported: 'Wake word needs Chrome or Edge',
+};
 
 export function Header({
   serverStatus,
@@ -43,6 +54,8 @@ export function Header({
   onToggleDiagnostics,
   account,
   onSignOut,
+  wakeStatus,
+  onToggleWakeWord,
 }: HeaderProps) {
   const now = useClock();
   const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -82,6 +95,17 @@ export function Header({
       </div>
 
       <div className="topbar__actions">
+        <button
+          type="button"
+          className={`hud-btn hud-btn--icon wake-btn wake-btn--${wakeStatus}`}
+          onClick={onToggleWakeWord}
+          disabled={wakeStatus === 'unsupported'}
+          aria-pressed={wakeStatus !== 'off' && wakeStatus !== 'unsupported'}
+          title={WAKE_TITLE[wakeStatus]}
+          aria-label={WAKE_TITLE[wakeStatus]}
+        >
+          <EarIcon />
+        </button>
         <button
           type="button"
           className={`hud-btn hud-btn--icon${diagnosticsOpen ? ' is-active' : ''}`}

@@ -1,16 +1,16 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
 // Web Speech API recognition is not in the standard DOM typings; declare the parts we use.
-interface RecognitionResultList {
+export interface RecognitionResultList {
   length: number;
   [index: number]: { isFinal: boolean; 0: { transcript: string } };
 }
 
-interface Recognition {
+export interface Recognition {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
-  onresult: ((event: { results: RecognitionResultList }) => void) | null;
+  onresult: ((event: { results: RecognitionResultList; resultIndex: number }) => void) | null;
   onerror: ((event: { error: string }) => void) | null;
   onend: (() => void) | null;
   start(): void;
@@ -20,7 +20,8 @@ interface Recognition {
 
 type RecognitionConstructor = new () => Recognition;
 
-const Recognition: RecognitionConstructor | undefined = (() => {
+/** The browser's SpeechRecognition constructor, if available. */
+export const Recognition: RecognitionConstructor | undefined = (() => {
   const w = window as unknown as {
     SpeechRecognition?: RecognitionConstructor;
     webkitSpeechRecognition?: RecognitionConstructor;

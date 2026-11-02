@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { YouTubeVideo } from '@prime/shared';
+import { BootSequence } from './components/BootSequence';
 import { ChatInput } from './components/ChatInput';
 import { DiagnosticsPanel } from './components/DiagnosticsPanel';
 import { DirectionsPanel } from './components/DirectionsPanel';
@@ -13,12 +14,16 @@ import { TripPanel } from './components/TripPanel';
 import { VoiceSettings } from './components/VoiceSettings';
 import { WeatherPanel } from './components/WeatherPanel';
 import { VOLUME_STEP, YouTubePanel, type MediaControls, type MediaSession } from './components/YouTubePanel';
-import { PcControlError, setSystemVolume } from './api/pc';
+import { PcControlError } from './api/pc';
 import { parseMediaCommand, type MediaCommand } from './media/commands';
-import { describeVolumeResult, parseSystemVolumeCommand } from './pc/volumeCommands';
+import { parsePcCommand } from './pc/commands';
+import { runPcCommand } from './pc/runPcCommand';
+import type { AttachedImage } from './media/image';
 import { useChat } from './hooks/useChat';
 import { useGeolocation } from './hooks/useGeolocation';
 import { useHandsFree } from './hooks/useHandsFree';
+import { useWakeWord } from './hooks/useWakeWord';
+import { playWakeChime } from './media/chime';
 import { useServerStatus } from './hooks/useServerStatus';
 import { useSpeechSynthesis } from './hooks/useSpeechSynthesis';
 import { useSystemStats } from './hooks/useSystemStats';
@@ -40,13 +45,37 @@ const STATE_LABEL: Record<ReactorState, string> = {
   speaking: 'Responding',
 };
 
-function loadVoiceReplies(): boolean {
+const WAKE_WORD_KEY = 'prime.wakeWord';
+const BOOTED_KEY = 'prime.booted';
+
+/** Play the boot sequence once per browser session, and never for reduced-motion users. */
+function shouldShowBoot(): boolean {
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
   try {
-    return localStorage.getItem(VOICE_REPLIES_KEY) !== 'off';
+    return sessionStorage.getItem(BOOTED_KEY) !== '1';
   } catch {
     return true;
   }
 }
+
+function loadFlag(key: string, fallback: boolean): boolean {
+  try {
+    const value = localStorage.getItem(key);
+    return value === null ? fallback : value === 'on';
+  } catch {
+    return fallback;
+  }
+}
+
+function saveFlag(key: string, value: boolean) {
+  try {
+    localStorage.setItem(key, value ? 'on' : 'off');
+  } catch {
+    // Preference simply won't persist.
+  }
+}
+
+const loadVoiceReplies = () => loadFlag(VOICE_REPLIES_KEY, true);
 
 interface AppProps {
   /** Signed-in user, or null when sign-in is disabled (local development without Firebase). */
@@ -76,11 +105,7 @@ export default function App({ account, onSignOut }: AppProps) {
     const next = !voiceReplies;
     setVoiceReplies(next);
     if (!next) speech.stop();
-    try {
-      localStorage.setItem(VOICE_REPLIES_KEY, next ? 'on' : 'off');
-    } catch {
-      // Preference simply won't persist.
-    }
+    saveFlag(VOICE_REPLIES_KEY, next);
   };
 
   const { send, clearConversation, newConversation, dismissError, addLocalExchange } = chat;
@@ -157,28 +182,29 @@ export default function App({ account, onSignOut }: AppProps) {
   };
 
   const handleSend = useCallback(
-    async (text: string) => {
+    async (text: string, image?: AttachedImage) => {
       stopSpeaking();
       setVoiceError(null);
 
-      // Playback commands are handled instantly in the browser, without the AI.
-      const command = mediaSession?.current ? parseMediaCommand(text) : null;
-      if (command && mediaSession) {
-        addLocalExchange(text, runMediaCommand(command, mediaSession));
-        return true;
-      }
-
-      // Explicit system-volume commands go straight to the backend; if PC control is off, the AI explains.
-      const volumeRequest = parseSystemVolumeCommand(text);
-      if (volumeRequest) {
-        try {
-          const result = await setSystemVolume(volumeRequest);
-          addLocalExchange(text, describeVolumeResult(volumeRequest.action, result));
+      if (!image) {
+        // Playback commands are handled instantly in the browser, without the AI.
+        const command = mediaSession?.current ? parseMediaCommand(text) : null;
+        if (command && mediaSession) {
+          addLocalExchange(text, runMediaCommand(command, mediaSession));
           return true;
-        } catch (error) {
-          if (!(error instanceof PcControlError) || !error.unavailable) {
-            addLocalExchange(text, error instanceof Error ? error.message : 'My apologies, Sir. That did not work.');
+        }
+
+        // Explicit PC commands go straight to the backend; if PC control is off, the AI explains.
+        const pcCommand = parsePcCommand(text);
+        if (pcCommand) {
+          try {
+            addLocalExchange(text, await runPcCommand(pcCommand));
             return true;
+          } catch (error) {
+            if (!(error instanceof PcControlError) || !error.unavailable) {
+              addLocalExchange(text, error instanceof Error ? error.message : 'My apologies, Sir. That did not work.');
+              return true;
+            }
           }
         }
       }
@@ -186,7 +212,7 @@ export default function App({ account, onSignOut }: AppProps) {
       // Ask for location only once weather comes up; afterwards it is reused for the session.
       const location = knownLocation() ?? (LOCATION_HINT.test(text) ? await getLocation() : null);
       const media = mediaSession?.current ? { title: mediaSession.current.title, playing: mediaPlaying } : null;
-      return send(text, { location, media });
+      return send(text, { location, media, image });
     },
     // runMediaCommand only touches stable refs/setters plus mediaSession, which is listed.
     [send, stopSpeaking, getLocation, knownLocation, mediaSession, mediaPlaying, addLocalExchange],
@@ -205,6 +231,9 @@ export default function App({ account, onSignOut }: AppProps) {
   };
 
   const [handsFree, setHandsFree] = useState(false);
+  const [wakeEnabled, setWakeEnabled] = useState(() => loadFlag(WAKE_WORD_KEY, false));
+  const [dictating, setDictating] = useState(false);
+
   const handsFreeSession = useHandsFree({
     enabled: handsFree,
     isLoading: chat.isLoading,
@@ -212,7 +241,26 @@ export default function App({ account, onSignOut }: AppProps) {
     send: handleSend,
     onDisable: () => setHandsFree(false),
     onError: setVoiceError,
+    // With the wake word armed, an idle voice link returns to waiting for "Hey Prime".
+    endAfterSilentRounds: wakeEnabled ? 2 : undefined,
   });
+
+  const wakeStatus = useWakeWord({
+    enabled: wakeEnabled,
+    paused: handsFree || chat.isLoading || speech.isSpeaking || dictating,
+    onWake: (request) => {
+      playWakeChime();
+      setVoiceError(null);
+      setHandsFree(true);
+      if (request.length > 1) void handleSend(request);
+    },
+  });
+
+  const toggleWakeWord = () => {
+    const next = !wakeEnabled;
+    setWakeEnabled(next);
+    saveFlag(WAKE_WORD_KEY, next);
+  };
 
   const reactorState: ReactorState =
     serverStatus === 'offline'
@@ -245,7 +293,11 @@ export default function App({ account, onSignOut }: AppProps) {
     if (reactorState === 'thinking') return 'One moment, Sir…';
     if (reactorState === 'speaking')
       return handsFree ? 'Tap the core whenever you wish to end the voice link.' : 'Tap the core should you wish me to stop.';
-    return handsFree ? 'Voice link engaged. I am at your service, Sir.' : 'At your service, Sir. Tap the core to speak.';
+    if (handsFree) return 'Voice link engaged. I am at your service, Sir.';
+    if (wakeStatus === 'blocked') return 'Microphone access is blocked, Sir, so I cannot listen for my name.';
+    return wakeStatus === 'armed'
+      ? 'Say “Hey Prime”, or tap the core, Sir.'
+      : 'At your service, Sir. Tap the core to speak.';
   })();
 
   // Diagnostics follow the latest reply: shown when it concerned the system, hidden once the
@@ -295,8 +347,28 @@ export default function App({ account, onSignOut }: AppProps) {
 
   const exchangeCount = chat.messages.length;
 
+  const [booting, setBooting] = useState(shouldShowBoot);
+  const finishBoot = useCallback(() => {
+    setBooting(false);
+    try {
+      sessionStorage.setItem(BOOTED_KEY, '1');
+    } catch {
+      // Boot will simply replay next load.
+    }
+  }, []);
+
   return (
     <div className="hud">
+      {booting && (
+        <BootSequence
+          serverStatus={serverStatus}
+          accountName={account?.name ?? null}
+          recognitionSupported={handsFreeSession.isSupported}
+          synthesisSupported={speech.isSupported}
+          wakeStatus={wakeStatus}
+          onDone={finishBoot}
+        />
+      )}
       <Header
         serverStatus={serverStatus}
         voiceReplies={voiceReplies}
@@ -318,6 +390,8 @@ export default function App({ account, onSignOut }: AppProps) {
         canClear={chat.messages.length > 1 || chat.isLoading}
         diagnosticsOpen={showDiagnostics}
         onToggleDiagnostics={toggleDiagnostics}
+        wakeStatus={wakeStatus}
+        onToggleWakeWord={toggleWakeWord}
         account={account}
         onSignOut={() => {
           stopSpeaking();
@@ -392,6 +466,7 @@ export default function App({ account, onSignOut }: AppProps) {
             onStopSpeaking={stopSpeaking}
             onVoiceError={setVoiceError}
             micDisabled={handsFree}
+            onDictatingChange={setDictating}
           />
         </section>
       </main>

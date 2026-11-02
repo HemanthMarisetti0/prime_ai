@@ -15,19 +15,28 @@ interface Options {
   send: (text: string) => Promise<boolean>;
   onDisable: () => void;
   onError: (message: string) => void;
+  /** End the voice link after this many silent listening rounds (each ~5-8 s); unlimited when omitted. */
+  endAfterSilentRounds?: number;
 }
 
 /** Listen → auto-send on pause → wait for the reply and its speech → listen again. */
-export function useHandsFree({ enabled, isLoading, isSpeaking, send, onDisable, onError }: Options) {
+export function useHandsFree({ enabled, isLoading, isSpeaking, send, onDisable, onError, endAfterSilentRounds }: Options) {
   const [transcript, setTranscript] = useState('');
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
+  const silentRoundsRef = useRef(0);
 
   const recognition = useSpeechRecognition({
     onTranscript: setTranscript,
     onEnd: (text) => {
       setTranscript('');
-      if (!enabledRef.current || !text) return;
+      if (!enabledRef.current) return;
+      if (!text) {
+        silentRoundsRef.current++;
+        if (endAfterSilentRounds && silentRoundsRef.current >= endAfterSilentRounds) onDisable();
+        return;
+      }
+      silentRoundsRef.current = 0;
       if (EXIT_PHRASES.test(text)) {
         onDisable();
         return;
@@ -58,6 +67,7 @@ export function useHandsFree({ enabled, isLoading, isSpeaking, send, onDisable, 
   }, [enabled, isLoading, isSpeaking, isListening, start, abort]);
 
   useEffect(() => {
+    silentRoundsRef.current = 0;
     if (!enabled) setTranscript('');
   }, [enabled]);
 

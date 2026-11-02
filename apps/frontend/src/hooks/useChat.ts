@@ -11,6 +11,7 @@ import type {
   YouTubeResults,
 } from '@prime/shared';
 import { sendChat, type ChatContext } from '../api/chat';
+import type { AttachedImage } from '../media/image';
 
 export interface UiMessage extends ChatMessage {
   id: string;
@@ -23,6 +24,8 @@ export interface UiMessage extends ChatMessage {
   places?: PlacesResult;
   directions?: DirectionsResult;
   trip?: TripPlan;
+  /** Preview of an image Sir attached to this message. */
+  imageUrl?: string;
 }
 
 // Mirror the backend validation limits (apps/backend/src/ai/dto/chat-request.dto.ts).
@@ -51,14 +54,17 @@ export function useChat() {
 
   /** Sends a message. Resolves false if it was not delivered, so the caller can restore the draft. */
   const send = useCallback(
-    async (text: string, context: ChatContext = {}): Promise<boolean> => {
-      const content = text.trim();
+    async (text: string, context: ChatContext & { image?: AttachedImage | null } = {}): Promise<boolean> => {
+      const image = context.image ?? null;
+      const content = text.trim() || (image ? 'What can you tell me about this image?' : '');
       if (!content || pendingRef.current) return false;
 
-      const history: ChatMessage[] = messages
-        .slice(-MAX_HISTORY_MESSAGES)
-        .map(({ role, content }) => ({ role, content: content.slice(0, MAX_HISTORY_CONTENT_LENGTH) }));
-      const userMessage = createMessage('user', content);
+      // Earlier images aren't re-sent; a marker keeps the conversation coherent.
+      const history: ChatMessage[] = messages.slice(-MAX_HISTORY_MESSAGES).map(({ role, content, imageUrl }) => ({
+        role,
+        content: `${imageUrl ? '[Sir attached an image] ' : ''}${content}`.slice(0, MAX_HISTORY_CONTENT_LENGTH),
+      }));
+      const userMessage = { ...createMessage('user', content), ...(image && { imageUrl: image.previewUrl }) };
       const controller = new AbortController();
       pendingRef.current = controller;
 

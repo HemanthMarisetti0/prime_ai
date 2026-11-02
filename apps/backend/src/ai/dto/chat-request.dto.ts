@@ -2,6 +2,7 @@ import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBase64,
   IsBoolean,
   IsIn,
   IsLatitude,
@@ -12,7 +13,15 @@ import {
   MaxLength,
   ValidateNested,
 } from 'class-validator';
-import type { ChatMessage, ChatRequest, ChatRole, MediaState, UserLocation } from '@prime/shared';
+import type {
+  ChatImage,
+  ChatImageMimeType,
+  ChatMessage,
+  ChatRequest,
+  ChatRole,
+  MediaState,
+  UserLocation,
+} from '@prime/shared';
 
 export const MAX_MESSAGE_LENGTH = 4000;
 export const MAX_HISTORY_MESSAGES = 50;
@@ -52,6 +61,18 @@ export class MediaStateDto implements MediaState {
   playing: boolean;
 }
 
+// ~4.5 MB of image data once decoded; the frontend downsizes images well below this.
+export const MAX_IMAGE_BASE64_LENGTH = 6_000_000;
+
+export class ChatImageDto implements ChatImage {
+  @IsIn(['image/jpeg', 'image/png', 'image/webp'])
+  mimeType: ChatImageMimeType;
+
+  @IsBase64()
+  @MaxLength(MAX_IMAGE_BASE64_LENGTH)
+  data: string;
+}
+
 export class ChatRequestDto implements ChatRequest {
   @Transform(trim)
   @IsString()
@@ -74,4 +95,9 @@ export class ChatRequestDto implements ChatRequest {
   @ValidateNested()
   @Type(() => MediaStateDto)
   media?: MediaStateDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => ChatImageDto)
+  image?: ChatImageDto;
 }

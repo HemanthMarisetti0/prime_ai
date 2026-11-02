@@ -21,12 +21,21 @@ export interface MediaState {
   playing: boolean;
 }
 
+export type ChatImageMimeType = 'image/jpeg' | 'image/png' | 'image/webp';
+
+/** An image attached to the current message (base64, without a data: prefix). */
+export interface ChatImage {
+  mimeType: ChatImageMimeType;
+  data: string;
+}
+
 export interface ChatRequest {
   message: string;
   history: ChatMessage[];
   /** Sir's current location, used for weather when no place is named. */
   location?: UserLocation;
   media?: MediaState;
+  image?: ChatImage;
 }
 
 export interface YouTubeVideo {
@@ -163,6 +172,23 @@ export interface SystemVolumeRequest {
 export interface SystemVolume {
   percent: number;
   muted: boolean;
+}
+
+export type PcAppId =
+  | 'vscode'
+  | 'notepad'
+  | 'calculator'
+  | 'explorer'
+  | 'chrome'
+  | 'edge'
+  | 'taskmanager'
+  | 'settings'
+  | 'paint';
+
+export type PcPowerAction = 'lock' | 'sleep';
+
+export interface ScreenBrightness {
+  percent: number;
 }
 
 export interface ApiErrorResponse {

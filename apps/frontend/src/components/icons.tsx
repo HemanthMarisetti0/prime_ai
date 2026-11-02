@@ -59,6 +59,28 @@ export const ActivityIcon = () => (
   </Icon>
 );
 
+export const ImageIcon = () => (
+  <Icon>
+    <rect x="3" y="3" width="18" height="18" rx="2" />
+    <circle cx="8.5" cy="8.5" r="1.5" />
+    <path d="m21 15-5-5L5 21" />
+  </Icon>
+);
+
+export const MonitorIcon = () => (
+  <Icon>
+    <rect x="2" y="3" width="20" height="14" rx="2" />
+    <path d="M8 21h8M12 17v4" />
+  </Icon>
+);
+
+export const EarIcon = () => (
+  <Icon>
+    <path d="M6 8.5a6 6 0 1 1 12 0c0 6-6 6-6 10a3.5 3.5 0 0 1-6.5 1.5" />
+    <path d="M15 8.5a3 3 0 0 0-6 0" />
+  </Icon>
+);
+
 export const LogoutIcon = () => (
   <Icon>
     <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />

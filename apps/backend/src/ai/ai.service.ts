@@ -9,11 +9,14 @@ import {
 } from '@nestjs/common';
 import { ApiError, GoogleGenAI, type Content, type FunctionCall, type FunctionDeclaration } from '@google/genai';
 import type {
+  ChatImage,
   ChatMessage,
   ChatResponse,
   MediaState,
   DirectionsResult,
   NewsReport,
+  PcAppId,
+  PcPowerAction,
   PlacesResult,
   SystemVolumeAction,
   TravelMode,
@@ -23,7 +26,10 @@ import type {
   YouTubeResults,
 } from '@prime/shared';
 import { env } from '../config/env';
+import { PC_APP_IDS } from '../pc/apps';
+import { BRIGHTNESS_ACTIONS, POWER_ACTIONS, type BrightnessAction } from '../pc/dto/pc-requests.dto';
 import { VOLUME_ACTIONS } from '../pc/dto/volume-request.dto';
+import { PcService } from '../pc/pc.service';
 import { toVolumeAction } from '../pc/volume-action';
 import { VolumeService } from '../pc/volume.service';
 import { describeSnapshot, SystemService } from '../system/system.service';
@@ -196,6 +202,39 @@ function toTripPlan(args: Record<string, unknown>): TripPlan {
   };
 }
 
+const PC_TOOLS: FunctionDeclaration[] = [
+  {
+    name: 'open_app',
+    description: "Open an application on Sir's computer. Only these apps are available.",
+    parametersJsonSchema: {
+      type: 'object',
+      properties: { app: { type: 'string', enum: PC_APP_IDS } },
+      required: ['app'],
+    },
+  },
+  {
+    name: 'set_brightness',
+    description: "Read or change the screen brightness of Sir's laptop display.",
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: [...BRIGHTNESS_ACTIONS] },
+        level: { type: 'integer', minimum: 0, maximum: 100, description: 'Target for "set", or step for "up"/"down" (default 10).' },
+      },
+      required: ['action'],
+    },
+  },
+  {
+    name: 'power_action',
+    description: "Lock Sir's computer or put it to sleep. Only when Sir explicitly asks.",
+    parametersJsonSchema: {
+      type: 'object',
+      properties: { action: { type: 'string', enum: POWER_ACTIONS } },
+      required: ['action'],
+    },
+  },
+];
+
 const SYSTEM_VOLUME_TOOL: FunctionDeclaration = {
   name: 'set_system_volume',
   description:
@@ -228,6 +267,7 @@ interface ToolResults {
 export interface ChatContext {
   location?: UserLocation;
   media?: MediaState;
+  image?: ChatImage;
 }
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -249,8 +289,9 @@ export class AiService {
     private readonly geoService: GeoService,
     private readonly directionsService: DirectionsService,
     private readonly currencyService: CurrencyService,
+    private readonly pcService: PcService,
   ) {
-    this.tools = [...TOOLS, ...TRAVEL_TOOLS, ...(volumeService.enabled ? [SYSTEM_VOLUME_TOOL] : [])];
+    this.tools = [...TOOLS, ...TRAVEL_TOOLS, ...(volumeService.enabled ? [SYSTEM_VOLUME_TOOL, ...PC_TOOLS] : [])];
     const { apiKey } = env.gemini;
     if (!apiKey) {
       this.logger.warn('GEMINI_API_KEY is not set; /api/chat will return 503.');
@@ -270,7 +311,7 @@ export class AiService {
       systemInstruction: buildSystemInstruction(telemetry, context.media, this.volumeService.enabled),
       tools: [{ functionDeclarations: this.tools }],
     };
-    const contents = toGeminiContents(message, history);
+    const contents = toGeminiContents(message, history, context.image);
     const results: ToolResults = {};
 
     try {
@@ -374,6 +415,23 @@ export class AiService {
           results.trip = toTripPlan(args);
           return { output: { displayed: true, total: results.trip.budget.total, currency: results.trip.budget.currency } };
         }
+        case 'open_app': {
+          const app = text(args.app) as PcAppId | undefined;
+          if (!app || !PC_APP_IDS.includes(app)) return { error: `That application is not on the allowed list: ${PC_APP_IDS.join(', ')}.` };
+          return { output: { opened: (await this.pcService.openApp(app)).app } };
+        }
+        case 'set_brightness': {
+          const action = text(args.action) as BrightnessAction | undefined;
+          if (!action || !BRIGHTNESS_ACTIONS.includes(action)) return { error: 'Unknown brightness action.' };
+          const level = typeof args.level === 'number' ? args.level : undefined;
+          return { output: { brightnessPercent: (await this.pcService.brightness(action, level)).percent } };
+        }
+        case 'power_action': {
+          const action = text(args.action) as PcPowerAction | undefined;
+          if (!action || !POWER_ACTIONS.includes(action)) return { error: 'Unknown power action.' };
+          const { inSeconds } = this.pcService.power(action);
+          return { output: { scheduled: action, inSeconds } };
+        }
         case 'set_system_volume': {
           const action = text(args.action) as SystemVolumeAction | undefined;
           if (!action || !VOLUME_ACTIONS.includes(action)) return { error: 'Unknown volume action.' };
@@ -470,13 +528,16 @@ export class AiService {
   }
 }
 
-function toGeminiContents(message: string, history: ChatMessage[]): Content[] {
+function toGeminiContents(message: string, history: ChatMessage[], image?: ChatImage): Content[] {
   const contents: Content[] = history.map((m) => ({
     role: m.role === 'assistant' ? 'model' : 'user',
     parts: [{ text: m.content }],
   }));
   // Gemini expects the conversation to open with a user turn (e.g. drop a UI greeting).
   while (contents[0]?.role === 'model') contents.shift();
-  contents.push({ role: 'user', parts: [{ text: message }] });
+  contents.push({
+    role: 'user',
+    parts: [{ text: message }, ...(image ? [{ inlineData: { mimeType: image.mimeType, data: image.data } }] : [])],
+  });
   return contents;
 }

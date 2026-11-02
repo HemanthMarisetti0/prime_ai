@@ -1,4 +1,12 @@
-import type { ApiErrorResponse, ChatMessage, ChatRequest, ChatResponse, MediaState, UserLocation } from '@prime/shared';
+import type {
+  ApiErrorResponse,
+  ChatImage,
+  ChatMessage,
+  ChatRequest,
+  ChatResponse,
+  MediaState,
+  UserLocation,
+} from '@prime/shared';
 import { API_BASE, authHeaders } from './config';
 
 const UNREACHABLE = 'My apologies, Sir. I cannot reach my server. Kindly check that the backend is running.';
@@ -17,15 +25,22 @@ export class ChatApiError extends Error {
 export interface ChatContext {
   location?: UserLocation | null;
   media?: MediaState | null;
+  image?: ChatImage | null;
 }
 
 export async function sendChat(
   message: string,
   history: ChatMessage[],
-  { location, media }: ChatContext,
+  { location, media, image }: ChatContext,
   signal?: AbortSignal,
 ): Promise<ChatResponse> {
-  const body: ChatRequest = { message, history, ...(location && { location }), ...(media && { media }) };
+  const body: ChatRequest = {
+    message,
+    history,
+    ...(location && { location }),
+    ...(media && { media }),
+    ...(image && { image: { mimeType: image.mimeType, data: image.data } }),
+  };
 
   let res: Response;
   try {

@@ -13,6 +13,7 @@ export function MessageBubble({ message }: { message: UiMessage }) {
         <span className="message__time">{formatTime(message.createdAt)}</span>
       </div>
       <div className="message__body">
+        {message.imageUrl && <img className="message__image" src={message.imageUrl} alt="Attached by you" />}
         {isUser ? message.content : <FormattedText text={message.content} />}
       </div>
     </div>

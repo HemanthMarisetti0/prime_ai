@@ -1,10 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { execFile } from 'node:child_process';
 import type { SystemVolume } from '@prime/shared';
 import { env } from '../config/env';
 import { buildAudioScript, type VolumeAction } from './audio.ps1';
-
-const TIMEOUT_MS = 20_000;
+import { runPowerShell } from './powershell';
 
 /** Controls the Windows master volume of the PC the backend runs on. */
 @Injectable()
@@ -21,23 +19,14 @@ export class VolumeService {
     return next;
   }
 
-  private execute(action: VolumeAction): Promise<SystemVolume> {
-    const encoded = Buffer.from(buildAudioScript(action), 'utf16le').toString('base64');
-    return new Promise((resolve, reject) => {
-      execFile(
-        'powershell.exe',
-        ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', encoded],
-        { timeout: TIMEOUT_MS, windowsHide: true },
-        (error, stdout, stderr) => {
-          const match = /(\d+)\|(True|False)/.exec(stdout);
-          if (error || !match) {
-            this.logger.warn(`Volume command failed: ${(error?.message ?? stderr).slice(0, 200)}`);
-            reject(new Error('The system volume could not be changed.'));
-            return;
-          }
-          resolve({ percent: Number(match[1]), muted: match[2] === 'True' });
-        },
-      );
-    });
+  private async execute(action: VolumeAction): Promise<SystemVolume> {
+    try {
+      const match = /(\d+)\|(True|False)/.exec(await runPowerShell(buildAudioScript(action)));
+      if (!match) throw new Error('Unexpected output');
+      return { percent: Number(match[1]), muted: match[2] === 'True' };
+    } catch (error) {
+      this.logger.warn(`Volume command failed: ${error instanceof Error ? error.message : String(error)}`);
+      throw new Error('The system volume could not be changed.');
+    }
   }
 }
