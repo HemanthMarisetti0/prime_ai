@@ -30,6 +30,33 @@ export const PlusIcon = () => (
   </Icon>
 );
 
+export const MicIcon = () => (
+  <Icon>
+    <rect x="9" y="2" width="6" height="12" rx="3" />
+    <path d="M5 10a7 7 0 0 0 14 0M12 17v5M8 22h8" />
+  </Icon>
+);
+
+export const StopIcon = () => (
+  <Icon>
+    <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />
+  </Icon>
+);
+
+export const VolumeIcon = () => (
+  <Icon>
+    <path d="M11 5 6 9H2v6h4l5 4V5z" />
+    <path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14" />
+  </Icon>
+);
+
+export const VolumeOffIcon = () => (
+  <Icon>
+    <path d="M11 5 6 9H2v6h4l5 4V5z" />
+    <path d="m22 9-6 6M16 9l6 6" />
+  </Icon>
+);
+
 export const TrashIcon = () => (
   <Icon>
     <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />

@@ -1,5 +1,5 @@
 import type { ServerStatus } from '../hooks/useServerStatus';
-import { PlusIcon, TrashIcon } from './icons';
+import { PlusIcon, TrashIcon, VolumeIcon, VolumeOffIcon } from './icons';
 
 export type CoreState = ServerStatus | 'processing';
 
@@ -12,12 +12,29 @@ const STATUS_LABEL: Record<CoreState, string> = {
 
 interface HeaderProps {
   coreState: CoreState;
+  voiceReplies: boolean;
+  voiceSupported: boolean;
+  onToggleVoiceReplies: () => void;
   onNewConversation: () => void;
   onClearConversation: () => void;
   canClear: boolean;
 }
 
-export function Header({ coreState, onNewConversation, onClearConversation, canClear }: HeaderProps) {
+export function Header({
+  coreState,
+  voiceReplies,
+  voiceSupported,
+  onToggleVoiceReplies,
+  onNewConversation,
+  onClearConversation,
+  canClear,
+}: HeaderProps) {
+  const voiceTitle = !voiceSupported
+    ? 'Spoken replies are not supported in this browser'
+    : voiceReplies
+      ? 'Spoken replies on'
+      : 'Spoken replies off';
+
   return (
     <header className="header">
       <div className="header__brand">
@@ -35,6 +52,17 @@ export function Header({ coreState, onNewConversation, onClearConversation, canC
         <span className={`status status--${coreState}`} role="status">
           {STATUS_LABEL[coreState]}
         </span>
+        <button
+          type="button"
+          className={`btn btn--ghost${voiceReplies && voiceSupported ? ' is-active' : ''}`}
+          onClick={onToggleVoiceReplies}
+          disabled={!voiceSupported}
+          aria-pressed={voiceReplies}
+          title={voiceTitle}
+          aria-label={voiceTitle}
+        >
+          {voiceReplies && voiceSupported ? <VolumeIcon /> : <VolumeOffIcon />}
+        </button>
         <button
           type="button"
           className="btn btn--ghost"

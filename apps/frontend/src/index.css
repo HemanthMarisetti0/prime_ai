@@ -500,6 +500,37 @@ textarea {
   box-shadow: 0 0 20px -2px var(--accent-glow);
 }
 
+.icon-btn--mic:not(:disabled):hover {
+  color: var(--accent);
+  background: rgb(56 189 248 / 0.08);
+}
+
+.icon-btn--mic.is-listening {
+  color: #fff;
+  background: var(--danger);
+  animation: mic-pulse 1.4s ease-out infinite;
+}
+
+.icon-btn--stop {
+  color: var(--warning);
+  border-color: rgb(251 191 36 / 0.4);
+  animation: message-in 0.2s ease-out both;
+}
+
+.icon-btn--stop:hover {
+  background: rgb(251 191 36 / 0.12);
+}
+
+.composer__field--listening,
+.composer__field--listening:focus-within {
+  border-color: var(--danger);
+  box-shadow: 0 0 0 3px rgb(248 113 113 / 0.15), 0 0 28px -8px rgb(248 113 113 / 0.5);
+}
+
+.btn.is-active {
+  color: var(--accent);
+}
+
 /* ---------- Animations ---------- */
 @keyframes message-in {
   from {
@@ -528,6 +559,15 @@ textarea {
 @keyframes spin {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@keyframes mic-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(248 113 113 / 0.55);
+  }
+  100% {
+    box-shadow: 0 0 0 12px rgb(248 113 113 / 0);
   }
 }
 
