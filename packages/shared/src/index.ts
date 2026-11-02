@@ -13,8 +13,12 @@ export interface ChatRequest {
   history: ChatMessage[];
 }
 
+/** Extra HUD panels the frontend should show alongside a reply. */
+export type ChatDisplay = 'system';
+
 export interface ChatResponse {
   reply: string;
+  display?: ChatDisplay;
 }
 
 export interface HealthResponse {

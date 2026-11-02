@@ -31,11 +31,11 @@ const Recognition: RecognitionConstructor | undefined = (() => {
 export const isSpeechRecognitionSupported = Boolean(Recognition);
 
 const ERROR_MESSAGES: Record<string, string> = {
-  'not-allowed': 'Microphone access was denied. Please allow it in your browser settings.',
-  'service-not-allowed': 'Speech recognition is blocked in this browser.',
-  'audio-capture': 'No microphone was found.',
-  'no-speech': 'No speech was detected. Please try again.',
-  network: 'Speech recognition needs an internet connection.',
+  'not-allowed': 'My apologies, Sir. I need microphone access; kindly allow it in your browser settings.',
+  'service-not-allowed': 'My apologies, Sir. Speech recognition is blocked in this browser.',
+  'audio-capture': 'My apologies, Sir. I could not find a microphone.',
+  'no-speech': 'Forgive me, Sir, I did not catch that. Would you kindly try again?',
+  network: 'My apologies, Sir. Speech recognition needs an internet connection.',
 };
 
 interface Options {

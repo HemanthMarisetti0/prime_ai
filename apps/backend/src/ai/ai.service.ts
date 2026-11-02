@@ -8,12 +8,19 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ApiError, GoogleGenAI, type Content } from '@google/genai';
-import type { ChatMessage } from '@prime/shared';
+import type { ChatMessage, ChatResponse } from '@prime/shared';
 import { describeSnapshot, SystemService } from '../system/system.service';
-import { buildSystemInstruction } from './prime.persona';
+import { buildSystemInstruction, SYSTEM_DISPLAY_TAG } from './prime.persona';
 
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 const REQUEST_TIMEOUT_MS = 30_000;
+
+// Backup for the model's display tag: questions that are clearly about the machine.
+const SYSTEM_QUESTION =
+  /\b(cpu|processor|ram|memory usage|disk|storage|drive space|battery|gpu|graphics card|temperature|diagnos\w*|uptime|system (status|stats|health|report|check)|(pc|computer|laptop|machine)('s)? (status|health|performance|stats))\b/i;
+
+const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const DISPLAY_TAG_PATTERN = new RegExp(`\\s*${escapeRegExp(SYSTEM_DISPLAY_TAG)}\\s*`, 'g');
 
 @Injectable()
 export class AiService {
@@ -31,12 +38,13 @@ export class AiService {
       : null;
   }
 
-  async chat(message: string, history: ChatMessage[]): Promise<string> {
+  async chat(message: string, history: ChatMessage[]): Promise<ChatResponse> {
     if (!this.client) {
-      throw new ServiceUnavailableException('AI provider is not configured.');
+      throw new ServiceUnavailableException('My apologies, Sir. My AI link has not been configured yet.');
     }
 
-    const systemInstruction = buildSystemInstruction(await this.getTelemetry());
+    const telemetry = await this.getTelemetry();
+    const systemInstruction = buildSystemInstruction(telemetry);
 
     try {
       const response = await this.client.models.generateContent({
@@ -45,11 +53,15 @@ export class AiService {
         config: { systemInstruction },
       });
 
-      const reply = response.text?.trim();
+      const raw = response.text?.trim() ?? '';
+      const tagged = raw.includes(SYSTEM_DISPLAY_TAG);
+      const reply = raw.replace(DISPLAY_TAG_PATTERN, ' ').trim();
       if (!reply) {
-        throw new BadGatewayException('The AI returned an empty response. Please try again.');
+        throw new BadGatewayException('My apologies, Sir. I received an empty response. Would you kindly try again?');
       }
-      return reply;
+
+      const showSystem = Boolean(telemetry) && (tagged || SYSTEM_QUESTION.test(message));
+      return showSystem ? { reply, display: 'system' } : { reply };
     } catch (error) {
       throw this.toHttpException(error);
     }
@@ -74,35 +86,35 @@ export class AiService {
         case 429: {
           if (/PerDay/i.test(error.message)) {
             return new HttpException(
-              `The daily free-tier limit for ${this.model} has been reached. Try again tomorrow or switch GEMINI_MODEL.`,
+              `My apologies, Sir. Today's free allowance for ${this.model} has been used up. It resets tomorrow, or another model can be set in GEMINI_MODEL.`,
               HttpStatus.TOO_MANY_REQUESTS,
             );
           }
           const retrySeconds = Number(/retry in ([\d.]+)s/i.exec(error.message)?.[1]);
           const wait = retrySeconds > 0 ? `about ${Math.ceil(retrySeconds)} seconds` : 'a moment';
           return new HttpException(
-            `Rate limit reached. Please try again in ${wait}.`,
+            `My apologies, Sir. I have reached my request limit. Kindly allow me ${wait} before trying again.`,
             HttpStatus.TOO_MANY_REQUESTS,
           );
         }
         case 400:
         case 401:
         case 403:
-          return new BadGatewayException('The AI provider rejected the request. Check the server configuration.');
+          return new BadGatewayException('My apologies, Sir. My AI provider declined the request. The server configuration may need checking.');
         case 503:
-          return new ServiceUnavailableException('The AI model is overloaded right now. Please try again shortly.');
+          return new ServiceUnavailableException('My apologies, Sir. The AI model is rather busy at the moment. Please try again shortly.');
         default:
-          return new BadGatewayException('The AI provider returned an error. Please try again.');
+          return new BadGatewayException('My apologies, Sir. My AI provider returned an error. Would you kindly try again?');
       }
     }
 
     if (error instanceof Error && /abort|timeout/i.test(error.name + error.message)) {
       this.logger.error(`Gemini request timed out: ${error.message}`);
-      return new GatewayTimeoutException('The AI took too long to respond. Please try again.');
+      return new GatewayTimeoutException('My apologies, Sir. That took longer than expected. Would you kindly try again?');
     }
 
     this.logger.error('Unexpected error calling Gemini', error instanceof Error ? error.stack : String(error));
-    return new BadGatewayException('Unable to reach the AI provider. Please try again.');
+    return new BadGatewayException('My apologies, Sir. I am unable to reach my AI provider just now. Please try again.');
   }
 }
 

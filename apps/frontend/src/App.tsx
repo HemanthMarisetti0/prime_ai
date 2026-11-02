@@ -35,7 +35,6 @@ export default function App() {
   const chat = useChat();
   const serverStatus = useServerStatus(chat.error);
   const speech = useSpeechSynthesis();
-  const systemStats = useSystemStats();
   const [voiceReplies, setVoiceReplies] = useState(loadVoiceReplies);
   const [voiceError, setVoiceError] = useState<string | null>(null);
   const lastHandledReplyRef = useRef<string | null>(null);
@@ -119,19 +118,33 @@ export default function App() {
   };
 
   const coreHint = (() => {
-    if (reactorState === 'offline') return 'Backend unreachable. Please check the server, Sir.';
-    if (!handsFreeSession.isSupported) return 'Voice link requires Chrome or Edge.';
-    if (reactorState === 'listening') return handsFreeSession.transcript || 'Speak now. Say “stop listening” to end.';
-    if (reactorState === 'thinking') return 'Analysing your request…';
-    if (reactorState === 'speaking') return handsFree ? 'Tap the core to end the voice link.' : 'Tap the core to silence.';
-    return handsFree ? 'Voice link engaged.' : 'Tap the core to talk.';
+    if (reactorState === 'offline') return 'My apologies, Sir. I cannot reach my server.';
+    if (!handsFreeSession.isSupported) return 'The voice link requires Chrome or Edge, Sir.';
+    if (reactorState === 'listening')
+      return handsFreeSession.transcript || 'I am listening, Sir. Say “stop listening” whenever you wish.';
+    if (reactorState === 'thinking') return 'One moment, Sir…';
+    if (reactorState === 'speaking')
+      return handsFree ? 'Tap the core whenever you wish to end the voice link.' : 'Tap the core should you wish me to stop.';
+    return handsFree ? 'Voice link engaged. I am at your service, Sir.' : 'At your service, Sir. Tap the core to speak.';
   })();
+
+  // Diagnostics follow the latest reply: shown when it concerned the system, hidden once the
+  // conversation moves on. A manual toggle applies only until the next reply arrives.
+  const latestReply = chat.messages.findLast((m) => m.role === 'assistant');
+  const [diagnosticsOverride, setDiagnosticsOverride] = useState<{ replyId?: string; open: boolean } | null>(null);
+  const showDiagnostics =
+    diagnosticsOverride && diagnosticsOverride.replyId === latestReply?.id
+      ? diagnosticsOverride.open
+      : latestReply?.display === 'system';
+  const toggleDiagnostics = () => setDiagnosticsOverride({ replyId: latestReply?.id, open: !showDiagnostics });
 
   const coreActionLabel = handsFree
     ? 'End voice link'
     : speech.isSpeaking
       ? 'Stop speaking'
       : 'Start voice link';
+
+  const systemStats = useSystemStats(showDiagnostics);
 
   const errorMessage = chat.error ?? voiceError;
   const handleDismissError = () => {
@@ -162,34 +175,39 @@ export default function App() {
         onNewConversation={handleNew}
         onClearConversation={handleClear}
         canClear={chat.messages.length > 1 || chat.isLoading}
+        diagnosticsOpen={showDiagnostics}
+        onToggleDiagnostics={toggleDiagnostics}
       />
 
       <main className="hud__body">
-        <div className="hud__left">
-        <section className={`core-panel panel core-panel--${reactorState}`} aria-label="Assistant core">
-          <div className="core-panel__scan" aria-hidden="true" />
-          <Reactor
-            state={reactorState}
-            active={handsFree}
-            disabled={!handsFreeSession.isSupported && !speech.isSpeaking}
-            label={coreActionLabel}
-            onActivate={activateCore}
-          />
-          <div className="core-panel__readout">
-            <p className="core-panel__state">{STATE_LABEL[reactorState]}</p>
-            <p className="core-panel__hint" aria-live="polite">
-              {coreHint}
-            </p>
-            <p className={`core-panel__link${handsFree ? ' is-on' : ''}`}>
-              Voice link · {handsFree ? 'Engaged' : 'Standby'}
-            </p>
-          </div>
-        </section>
-        <DiagnosticsPanel
-          snapshot={systemStats}
-          canRun={!chat.isLoading}
-          onRunDiagnostics={() => void handleSend('Run a full system diagnostic.')}
-        />
+        <div className={`hud__left${showDiagnostics ? ' hud__left--diagnostics' : ''}`}>
+          <section className={`core-panel panel core-panel--${reactorState}`} aria-label="Assistant core">
+            <div className="core-panel__scan" aria-hidden="true" />
+            <Reactor
+              state={reactorState}
+              active={handsFree}
+              disabled={!handsFreeSession.isSupported && !speech.isSpeaking}
+              label={coreActionLabel}
+              onActivate={activateCore}
+            />
+            <div className="core-panel__readout">
+              <p className="core-panel__state">{STATE_LABEL[reactorState]}</p>
+              <p className="core-panel__hint" aria-live="polite">
+                {coreHint}
+              </p>
+              <p className={`core-panel__link${handsFree ? ' is-on' : ''}`}>
+                Voice link · {handsFree ? 'Engaged' : 'Standby'}
+              </p>
+            </div>
+          </section>
+          {showDiagnostics && (
+            <DiagnosticsPanel
+              snapshot={systemStats}
+              canRun={!chat.isLoading}
+              onRunDiagnostics={() => void handleSend('Run a full system diagnostic, please.')}
+              onClose={toggleDiagnostics}
+            />
+          )}
         </div>
 
         <section className="comms panel" aria-label="Conversation">

@@ -10,7 +10,6 @@ export class AiController {
   @Post()
   @HttpCode(200)
   async chat(@Body() body: ChatRequestDto): Promise<ChatResponseDto> {
-    const reply = await this.aiService.chat(body.message, body.history);
-    return { reply };
+    return this.aiService.chat(body.message, body.history);
   }
 }

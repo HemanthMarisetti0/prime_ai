@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ChatMessage, ChatRole } from '@prime/shared';
+import type { ChatDisplay, ChatMessage, ChatRole } from '@prime/shared';
 import { sendChat } from '../api/chat';
 
 export interface UiMessage extends ChatMessage {
   id: string;
   createdAt: number;
+  /** HUD panel the reply asked to show (e.g. system diagnostics). */
+  display?: ChatDisplay;
 }
 
 // Mirror the backend validation limits (apps/backend/src/ai/dto/chat-request.dto.ts).
@@ -49,13 +51,13 @@ export function useChat() {
       setIsLoading(true);
 
       try {
-        const reply = await sendChat(content, history, controller.signal);
-        setMessages((prev) => [...prev, createMessage('assistant', reply)]);
+        const { reply, display } = await sendChat(content, history, controller.signal);
+        setMessages((prev) => [...prev, { ...createMessage('assistant', reply), display }]);
         return true;
       } catch (err) {
         if (controller.signal.aborted) return false;
         setMessages((prev) => prev.filter((m) => m.id !== userMessage.id));
-        setError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+        setError(err instanceof Error ? err.message : 'My apologies, Sir. Something went wrong. Would you kindly try again?');
         return false;
       } finally {
         if (pendingRef.current === controller) {

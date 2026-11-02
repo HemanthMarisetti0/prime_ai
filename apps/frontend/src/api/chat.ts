@@ -1,7 +1,7 @@
 import type { ApiErrorResponse, ChatMessage, ChatRequest, ChatResponse } from '@prime/shared';
 import { API_BASE } from './config';
 
-const UNREACHABLE = 'Unable to reach the P.R.I.M.E. server. Please check that the backend is running.';
+const UNREACHABLE = 'My apologies, Sir. I cannot reach my server. Kindly check that the backend is running.';
 
 export class ChatApiError extends Error {
   readonly status?: number;
@@ -17,7 +17,7 @@ export async function sendChat(
   message: string,
   history: ChatMessage[],
   signal?: AbortSignal,
-): Promise<string> {
+): Promise<ChatResponse> {
   const body: ChatRequest = { message, history };
 
   let res: Response;
@@ -42,7 +42,7 @@ export async function sendChat(
   }
 
   if (!data || !('reply' in data)) {
-    throw new ChatApiError('Received an invalid response from the server.', res.status);
+    throw new ChatApiError('My apologies, Sir. I received an unexpected response from my server.', res.status);
   }
-  return data.reply;
+  return data;
 }

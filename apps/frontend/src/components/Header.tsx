@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { useClock } from '../hooks/useClock';
 import type { ServerStatus } from '../hooks/useServerStatus';
-import { PlusIcon, TrashIcon, VolumeIcon, VolumeOffIcon } from './icons';
+import { ActivityIcon, PlusIcon, TrashIcon, VolumeIcon, VolumeOffIcon } from './icons';
 
 const LINK_LABEL: Record<ServerStatus, string> = {
   checking: 'Linking',
@@ -18,6 +18,8 @@ interface HeaderProps {
   onNewConversation: () => void;
   onClearConversation: () => void;
   canClear: boolean;
+  diagnosticsOpen: boolean;
+  onToggleDiagnostics: () => void;
 }
 
 export function Header({
@@ -29,6 +31,8 @@ export function Header({
   onNewConversation,
   onClearConversation,
   canClear,
+  diagnosticsOpen,
+  onToggleDiagnostics,
 }: HeaderProps) {
   const now = useClock();
   const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
@@ -68,6 +72,16 @@ export function Header({
       </div>
 
       <div className="topbar__actions">
+        <button
+          type="button"
+          className={`hud-btn hud-btn--icon${diagnosticsOpen ? ' is-active' : ''}`}
+          onClick={onToggleDiagnostics}
+          aria-pressed={diagnosticsOpen}
+          title={diagnosticsOpen ? 'Hide system diagnostics' : 'Show system diagnostics'}
+          aria-label={diagnosticsOpen ? 'Hide system diagnostics' : 'Show system diagnostics'}
+        >
+          <ActivityIcon />
+        </button>
         <button
           type="button"
           className={`hud-btn hud-btn--icon${voiceReplies && voiceSupported ? ' is-active' : ''}`}

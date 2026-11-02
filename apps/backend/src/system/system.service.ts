@@ -153,8 +153,14 @@ export function describeSnapshot(s: SystemSnapshot): string {
     `- CPU: ${s.cpu.model}, ${s.cpu.physicalCores ?? '?'} cores / ${s.cpu.threads} threads, load ${
       s.cpu.loadPercent ?? '?'
     }%, temperature ${temp(s.cpu.temperatureC)}`,
-    `- Memory: ${gb(s.memory.usedBytes)} of ${gb(s.memory.totalBytes)} used (${s.memory.usedPercent}%)`,
-    `- Disks: ${s.disks.map((d) => `${d.mount} ${gb(d.usedBytes)} of ${gb(d.totalBytes)} used (${d.usedPercent}%)`).join('; ') || 'unavailable'}`,
+    `- Memory: ${s.memory.usedPercent}% used (used ${gb(s.memory.usedBytes)}, free ${gb(
+      s.memory.totalBytes - s.memory.usedBytes,
+    )}, total ${gb(s.memory.totalBytes)})`,
+    `- Disks: ${
+      s.disks
+        .map((d) => `${d.mount} ${d.usedPercent}% used (free ${gb(d.totalBytes - d.usedBytes)}, total ${gb(d.totalBytes)})`)
+        .join('; ') || 'unavailable'
+    }`,
     `- GPUs: ${s.gpus.map((g) => `${g.model}${g.vramMB ? ` (${g.vramMB} MB)` : ''}, temperature ${temp(g.temperatureC)}`).join('; ') || 'unavailable'}`,
     `- Battery: ${battery}`,
     `- P.R.I.M.E. backend: Node ${s.backend.nodeVersion}, using ${s.backend.memoryMB} MB`,

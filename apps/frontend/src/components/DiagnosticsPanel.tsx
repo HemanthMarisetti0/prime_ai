@@ -1,4 +1,5 @@
 import type { SystemSnapshot } from '@prime/shared';
+import { CloseIcon } from './icons';
 
 const GB = 1024 ** 3;
 const gb = (bytes: number) => (bytes / GB).toFixed(1);
@@ -42,17 +43,25 @@ function Meter({ label, percent, detail, inverted, compact }: MeterProps) {
 interface DiagnosticsPanelProps {
   snapshot: SystemSnapshot | null | undefined;
   onRunDiagnostics: () => void;
+  onClose: () => void;
   canRun: boolean;
 }
 
-export function DiagnosticsPanel({ snapshot, onRunDiagnostics, canRun }: DiagnosticsPanelProps) {
+export function DiagnosticsPanel({ snapshot, onRunDiagnostics, onClose, canRun }: DiagnosticsPanelProps) {
+  const closeButton = (
+    <button type="button" className="hud-btn hud-btn--icon diag__close" onClick={onClose} aria-label="Hide diagnostics" title="Hide diagnostics">
+      <CloseIcon />
+    </button>
+  );
+
   if (snapshot === null) {
     return (
       <section className="diag panel" aria-label="System diagnostics">
         <div className="diag__header">
           <span>System diagnostics</span>
+          {closeButton}
         </div>
-        <p className="diag__empty">Telemetry unavailable.</p>
+        <p className="diag__empty">My apologies, Sir. Telemetry is unavailable at the moment.</p>
       </section>
     );
   }
@@ -65,13 +74,16 @@ export function DiagnosticsPanel({ snapshot, onRunDiagnostics, canRun }: Diagnos
     <section className="diag panel" aria-label="System diagnostics">
       <div className="diag__header">
         <span>System diagnostics</span>
-        <button type="button" className="hud-btn diag__run" onClick={onRunDiagnostics} disabled={!canRun || !snapshot}>
-          Run diagnostics
-        </button>
+        <div className="diag__actions">
+          <button type="button" className="hud-btn diag__run" onClick={onRunDiagnostics} disabled={!canRun || !snapshot}>
+            Full report
+          </button>
+          {closeButton}
+        </div>
       </div>
 
       {!snapshot ? (
-        <p className="diag__empty">Scanning systems…</p>
+        <p className="diag__empty">Scanning your systems, Sir…</p>
       ) : (
         <div className="diag__grid">
           <Meter

@@ -96,7 +96,7 @@ export function ChatInput({ onSend, isLoading, isSpeaking, onStopSpeaking, onVoi
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={speech.isListening ? 'Listening… speak now, Sir.' : 'Awaiting your command, Sir…'}
+          placeholder={speech.isListening ? 'Listening… speak now, Sir.' : 'How may I help you, Sir?'}
           rows={1}
           maxLength={MAX_MESSAGE_LENGTH}
           readOnly={speech.isListening}
