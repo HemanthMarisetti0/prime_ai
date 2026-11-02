@@ -8,6 +8,7 @@ import { ErrorBanner } from './components/ErrorBanner';
 import { Header, type Account } from './components/Header';
 import { MessageList } from './components/MessageList';
 import { NewsPanel } from './components/NewsPanel';
+import { PersonPanel } from './components/PersonPanel';
 import { PlacesPanel } from './components/PlacesPanel';
 import { QuickActions } from './components/QuickActions';
 import { Reactor, type ReactorState } from './components/Reactor';
@@ -35,7 +36,7 @@ const VOICE_REPLIES_KEY = 'prime.voiceReplies';
 const LOCATION_HINT =
   /\b(weather|forecast|temperature|rain\w*|umbrella|sunny|cloudy|humid\w*|windy|snow\w*|storm\w*|degrees|near me|nearby|nearest|closest|around here|directions?|route|navigate|how far|how long (does it take|to get|to reach)|get to|take me to|way to)\b/i;
 
-type InfoPanel = 'weather' | 'news' | 'places' | 'directions' | 'trip';
+type InfoPanel = 'weather' | 'news' | 'places' | 'directions' | 'trip' | 'person';
 
 const STATE_LABEL: Record<ReactorState, string> = {
   connecting: 'Initialising',
@@ -325,9 +326,10 @@ export default function App({ account, onSignOut }: AppProps) {
   const placesResult = isClosed('places') ? undefined : latestReply?.places;
   const directionsResult = isClosed('directions') ? undefined : latestReply?.directions;
   const tripPlan = isClosed('trip') ? undefined : latestReply?.trip;
+  const personProfile = isClosed('person') ? undefined : latestReply?.person;
   const hasSidePanel =
     showDiagnostics ||
-    Boolean(mediaSession || weatherReport || newsReport || placesResult || directionsResult || tripPlan);
+    Boolean(mediaSession || weatherReport || newsReport || placesResult || directionsResult || tripPlan || personProfile);
 
   // Lower the music while P.R.I.M.E. speaks or listens.
   const mediaDucked = speech.isSpeaking || handsFreeSession.phase === 'listening';
@@ -449,6 +451,7 @@ export default function App({ account, onSignOut }: AppProps) {
               onClose={toggleDiagnostics}
             />
           )}
+          {personProfile && <PersonPanel profile={personProfile} onClose={() => closePanel('person')} />}
           {weatherReport && <WeatherPanel report={weatherReport} onClose={() => closePanel('weather')} />}
           {newsReport && <NewsPanel report={newsReport} onClose={() => closePanel('news')} />}
           {directionsResult && <DirectionsPanel result={directionsResult} onClose={() => closePanel('directions')} />}

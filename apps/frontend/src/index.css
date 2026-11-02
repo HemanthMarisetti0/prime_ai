@@ -1686,6 +1686,121 @@ select {
   text-decoration: underline;
 }
 
+/* ---------- Person profile ---------- */
+.person__body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 46vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.person__intro {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.person__photo {
+  flex-shrink: 0;
+  width: 112px;
+  aspect-ratio: 4 / 5;
+  object-fit: cover;
+  object-position: top;
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 0 18px rgb(0 212 255 / 0.18);
+  background: var(--panel-solid);
+}
+
+.person__heading {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.person__name {
+  margin: 0;
+  font-family: var(--font-hud);
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.15;
+  color: var(--text);
+}
+
+.person__description {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--cyan-soft);
+}
+
+.person__facts {
+  margin: 6px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.person__fact {
+  display: grid;
+  grid-template-columns: 86px 1fr;
+  gap: 8px;
+  font-size: 0.82rem;
+  line-height: 1.3;
+}
+
+.person__fact dt {
+  font-family: var(--font-hud);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  padding-top: 1px;
+}
+
+.person__fact dd {
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+.person__summary {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.person__link {
+  display: inline-block;
+  margin-top: 10px;
+  font-family: var(--font-hud);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  text-decoration: none;
+}
+
+.person__link:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 420px) {
+  .person__photo {
+    width: 88px;
+  }
+
+  .person__fact {
+    grid-template-columns: 74px 1fr;
+  }
+}
+
 /* ---------- Places ---------- */
 .places__list {
   margin: 0;

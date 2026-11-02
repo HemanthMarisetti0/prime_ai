@@ -5,6 +5,7 @@ import type {
   ChatRole,
   DirectionsResult,
   NewsReport,
+  PersonProfile,
   PlacesResult,
   TripPlan,
   WeatherReport,
@@ -26,6 +27,7 @@ export interface UiMessage extends ChatMessage {
   places?: PlacesResult;
   directions?: DirectionsResult;
   trip?: TripPlan;
+  person?: PersonProfile;
   /** Preview of an image Sir attached to this message. */
   imageUrl?: string;
 }

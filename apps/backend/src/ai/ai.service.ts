@@ -16,6 +16,7 @@ import type {
   DirectionsResult,
   NewsReport,
   PcAppId,
+  PersonProfile,
   PcPowerAction,
   PlacesResult,
   SystemVolumeAction,
@@ -37,6 +38,7 @@ import { CurrencyService } from '../tools/currency.service';
 import { DirectionsService } from '../tools/directions.service';
 import { GeoService } from '../tools/geo.service';
 import { NewsService } from '../tools/news.service';
+import { PersonService } from '../tools/person.service';
 import { WeatherService } from '../tools/weather.service';
 import { YouTubeService } from '../tools/youtube.service';
 import { classifyModelError, ModelPool } from './model-pool';
@@ -70,6 +72,18 @@ const TOOLS: FunctionDeclaration[] = [
       properties: {
         topic: { type: 'string', description: 'A short search topic such as "cricket" or "artificial intelligence".' },
       },
+    },
+  },
+  {
+    name: 'lookup_person',
+    description:
+      "Look up a person (or a well-known character, band or group) on Wikipedia and show a profile card with their photo and key facts on Sir's display.",
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Full name, with a hint when ambiguous, e.g. "Virat Kohli" or "Michael Jordan basketball".' },
+      },
+      required: ['name'],
     },
   },
   {
@@ -262,6 +276,7 @@ interface ToolResults {
   places?: PlacesResult;
   directions?: DirectionsResult;
   trip?: TripPlan;
+  person?: PersonProfile;
 }
 
 /** Per-request context from Sir's browser. */
@@ -291,6 +306,7 @@ export class AiService {
     private readonly directionsService: DirectionsService,
     private readonly currencyService: CurrencyService,
     private readonly pcService: PcService,
+    private readonly personService: PersonService,
   ) {
     this.tools = [...TOOLS, ...TRAVEL_TOOLS, ...(volumeService.enabled ? [SYSTEM_VOLUME_TOOL, ...PC_TOOLS] : [])];
     const { apiKey } = env.gemini;
@@ -500,6 +516,14 @@ export class AiService {
                 : 'The suggestions are listed on the display; nothing is playing yet.',
             },
           };
+        }
+        case 'lookup_person': {
+          const name = text(args.name)?.trim();
+          if (!name) return { error: 'A name is required.' };
+          results.person = await this.personService.lookup(name);
+          // The photo and link are on the display; the model only needs the text.
+          const { imageUrl: _image, sourceUrl: _url, ...profile } = results.person;
+          return { output: { ...profile, note: "A profile card with a photo is shown on Sir's display." } };
         }
         case 'get_news': {
           results.news = await this.newsService.getNews(text(args.topic));

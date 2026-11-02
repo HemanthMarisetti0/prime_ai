@@ -131,6 +131,25 @@ export interface TripPlan {
   tips: string[];
 }
 
+export interface PersonFact {
+  label: string;
+  value: string;
+}
+
+/** A profile card about someone (or something) Sir asked about, from Wikipedia. */
+export interface PersonProfile {
+  name: string;
+  /** Short tagline, e.g. "Indian cricketer (born 1988)". */
+  description: string | null;
+  summary: string;
+  imageUrl: string | null;
+  /** False when the best match wasn't a person (e.g. a band or a fictional character). */
+  isPerson: boolean;
+  /** Born, age, nationality, occupation and similar; empty when unknown. */
+  facts: PersonFact[];
+  sourceUrl: string;
+}
+
 /** Extra HUD panels the frontend should show alongside a reply. */
 export type ChatDisplay = 'system';
 
@@ -145,6 +164,7 @@ export interface ChatResponse {
   places?: PlacesResult;
   directions?: DirectionsResult;
   trip?: TripPlan;
+  person?: PersonProfile;
 }
 
 export interface HealthResponse {
