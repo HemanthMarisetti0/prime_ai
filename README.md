@@ -123,6 +123,35 @@ The backend verifies Firebase ID tokens against Google's public keys, so no serv
 2. **APIs & Services → Credentials → Create credentials → API key**, restricted to YouTube Data API v3.
 3. Set `YOUTUBE_API_KEY` in the backend settings. The free quota allows about 100 searches a day.
 
+## Deploying to Render
+
+`render.yaml` is a Render Blueprint that creates two services from the repository:
+
+| Service | Type | Notes |
+|---|---|---|
+| `prime-backend` | Node web service (free) | Health check `/api/health`; PC telemetry and control are off |
+| `prime-frontend` | Static site | `apps/frontend/dist`, SPA rewrite to `index.html` |
+
+1. Push the repository, then in Render choose **New → Blueprint** and select it.
+2. Enter the `sync: false` values when prompted:
+   - `GEMINI_API_KEY`: your Gemini key.
+   - `ALLOWED_EMAILS`: your Google address.
+   - `YOUTUBE_API_KEY`: optional; use a separate key restricted to YouTube Data API v3.
+   - `CORS_ORIGIN` and `VITE_API_URL`: enter placeholders if the URLs aren't known yet.
+3. After the first deploy, copy the real URLs from the dashboard:
+   - backend `CORS_ORIGIN` = the frontend URL (e.g. `https://prime-frontend.onrender.com`)
+   - frontend `VITE_API_URL` = the backend URL (e.g. `https://prime-backend.onrender.com`)
+
+   Then redeploy the **frontend** (Vite bakes `VITE_*` values in at build time); the backend restarts on its own after env changes.
+4. In Firebase, add the frontend's domain under **Authentication → Settings → Authorized domains**.
+5. Recommended: in Google Cloud → Credentials, restrict the Firebase browser key to your frontend domain.
+
+Notes:
+
+- Free web services sleep after ~15 minutes idle; the first request then takes about a minute (the HUD shows "Offline" until the backend wakes).
+- The build uses `pnpm install --prod=false` because `NODE_ENV=production` also applies at build time.
+- `.node-version` pins Node 24.
+
 ## Things to say
 
 | Category | Examples |

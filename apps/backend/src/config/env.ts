@@ -31,6 +31,15 @@ const list = (value: string | undefined) =>
     .filter(Boolean);
 const flag = (value: string | undefined, fallback: boolean) =>
   text(value) ? !['false', '0', 'no', 'off'].includes(text(value).toLowerCase()) : fallback;
+/** Browsers send origins as "https://host" with no path or trailing slash; accept pasted URLs too. */
+const origin = (value: string) => {
+  const withScheme = /^https?:\/\//i.test(value) ? value : `https://${value}`;
+  try {
+    return new URL(withScheme).origin;
+  } catch {
+    return withScheme.replace(/\/+$/, '');
+  }
+};
 
 export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
   const nodeEnv: NodeEnv = text(source.NODE_ENV) === 'production' ? 'production' : 'development';
@@ -40,7 +49,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
     nodeEnv,
     isProduction,
     port: Number(source.PORT) || 3000,
-    corsOrigins: list(source.CORS_ORIGIN),
+    corsOrigins: list(source.CORS_ORIGIN).map(origin),
     gemini: { apiKey: text(source.GEMINI_API_KEY), model: text(source.GEMINI_MODEL) || 'gemini-2.5-flash' },
     // A cloud server would report its own hardware, so telemetry defaults off in production.
     systemMonitor: flag(source.SYSTEM_MONITOR, !isProduction),
