@@ -10,6 +10,9 @@ const SIGN_IN_ERRORS: Record<string, string> = {
   'auth/popup-blocked': 'Your browser blocked the sign-in window, Sir. Kindly allow pop-ups for this site.',
   'auth/network-request-failed': 'I could not reach the sign-in service, Sir. Kindly check your connection.',
   'auth/unauthorized-domain': 'This address is not authorised for sign-in. Add it under Authentication → Settings in Firebase.',
+  'auth/configuration-not-found':
+    'Firebase Authentication is not set up yet, Sir. In the Firebase console, open Authentication, click “Get started”, then enable Google.',
+  'auth/operation-not-allowed': 'Google sign-in is not enabled, Sir. Enable it under Authentication → Sign-in method in Firebase.',
 };
 
 export function useAuth() {
