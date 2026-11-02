@@ -537,6 +537,78 @@ textarea {
   box-shadow: 0 0 18px -4px var(--accent-glow);
 }
 
+/* ---------- Voice settings ---------- */
+.settings {
+  position: relative;
+}
+
+.settings__panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 10;
+  width: min(320px, calc(100vw - 32px));
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-solid);
+  box-shadow: 0 18px 40px -12px rgb(0 0 0 / 0.7), 0 0 24px -12px var(--accent-glow);
+  animation: message-in 0.18s ease-out both;
+}
+
+.settings__title {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.settings__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.settings__field span {
+  display: flex;
+  justify-content: space-between;
+}
+
+.settings__field output {
+  color: var(--text);
+}
+
+.settings__field select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border-strong);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.settings__field input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.settings__test {
+  justify-content: center;
+}
+
+.settings__note {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-faint);
+}
+
 /* ---------- Hands-free bar ---------- */
 .handsfree {
   --wave-color: var(--accent);
@@ -744,7 +816,7 @@ textarea {
   }
 }
 
-@media (max-width: 380px) {
+@media (max-width: 480px) {
   .status {
     display: none;
   }

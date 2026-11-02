@@ -4,13 +4,34 @@ const synth = 'speechSynthesis' in window ? window.speechSynthesis : undefined;
 
 export const isSpeechSynthesisSupported = Boolean(synth);
 
-// Preferred voices, in order; falls back to the browser language, then any English voice.
+// Default voice preference, in order; falls back to the browser language, then any English voice.
 const PREFERRED_VOICES = [/Microsoft Ryan/i, /Google UK English Male/i, /Microsoft George/i, /^Daniel/i];
 
 // Chrome stops long utterances after ~15s, so speak in sentence-sized chunks.
 const MAX_CHUNK_LENGTH = 200;
 
-function pickVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
+const VOICE_KEY = 'prime.voice';
+const RATE_KEY = 'prime.voiceRate';
+export const MIN_RATE = 0.6;
+export const MAX_RATE = 1.6;
+
+function load(key: string): string | null {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function save(key: string, value: string) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Preference simply won't persist.
+  }
+}
+
+function pickDefaultVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | undefined {
   for (const pattern of PREFERRED_VOICES) {
     const match = voices.find((v) => pattern.test(v.name));
     if (match) return match;
@@ -45,7 +66,12 @@ function splitIntoChunks(text: string): string[] {
 
 export function useSpeechSynthesis() {
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const voiceRef = useRef<SpeechSynthesisVoice | undefined>(undefined);
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [savedVoiceURI, setSavedVoiceURI] = useState(() => load(VOICE_KEY));
+  const [rate, setRateState] = useState(() => {
+    const stored = Number(load(RATE_KEY));
+    return stored >= MIN_RATE && stored <= MAX_RATE ? stored : 1;
+  });
   // Incremented on every speak/stop so callbacks from cancelled utterances are ignored.
   const generationRef = useRef(0);
   // Chrome can garbage-collect queued utterances and skip their `end` event; keep them referenced.
@@ -53,9 +79,7 @@ export function useSpeechSynthesis() {
 
   useEffect(() => {
     if (!synth) return;
-    const loadVoices = () => {
-      voiceRef.current = pickVoice(synth.getVoices());
-    };
+    const loadVoices = () => setVoices(synth.getVoices());
     loadVoices();
     synth.addEventListener('voiceschanged', loadVoices);
     return () => {
@@ -63,6 +87,12 @@ export function useSpeechSynthesis() {
       synth.cancel();
     };
   }, []);
+
+  const voice = voices.find((v) => v.voiceURI === savedVoiceURI) ?? pickDefaultVoice(voices);
+  const voiceRef = useRef(voice);
+  const rateRef = useRef(rate);
+  voiceRef.current = voice;
+  rateRef.current = rate;
 
   const stop = useCallback(() => {
     if (!synth) return;
@@ -88,6 +118,7 @@ export function useSpeechSynthesis() {
         utterance.voice = voiceRef.current;
         utterance.lang = voiceRef.current.lang;
       }
+      utterance.rate = rateRef.current;
       if (index === chunks.length - 1) {
         utterance.onend = () => isCurrent() && setIsSpeaking(false);
       }
@@ -97,5 +128,25 @@ export function useSpeechSynthesis() {
     });
   }, []);
 
-  return { isSupported: isSpeechSynthesisSupported, isSpeaking, speak, stop };
+  const setVoice = useCallback((voiceURI: string) => {
+    setSavedVoiceURI(voiceURI);
+    save(VOICE_KEY, voiceURI);
+  }, []);
+
+  const setRate = useCallback((value: number) => {
+    setRateState(value);
+    save(RATE_KEY, String(value));
+  }, []);
+
+  return {
+    isSupported: isSpeechSynthesisSupported,
+    isSpeaking,
+    speak,
+    stop,
+    voices,
+    voice,
+    setVoice,
+    rate,
+    setRate,
+  };
 }

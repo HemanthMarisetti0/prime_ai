@@ -44,6 +44,15 @@ export const HeadsetIcon = () => (
   </Icon>
 );
 
+export const SettingsIcon = () => (
+  <Icon>
+    <path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" />
+    <circle cx="16" cy="6" r="2" />
+    <circle cx="10" cy="12" r="2" />
+    <circle cx="18" cy="18" r="2" />
+  </Icon>
+);
+
 export const StopIcon = () => (
   <Icon>
     <rect x="6" y="6" width="12" height="12" rx="2" fill="currentColor" />

@@ -3,6 +3,7 @@ import { ChatInput } from './components/ChatInput';
 import { ErrorBanner } from './components/ErrorBanner';
 import { Header } from './components/Header';
 import { MessageList } from './components/MessageList';
+import { VoiceSettings } from './components/VoiceSettings';
 import { HandsFreeBar } from './components/HandsFreeBar';
 import { useChat } from './hooks/useChat';
 import { useHandsFree } from './hooks/useHandsFree';
@@ -100,6 +101,17 @@ export default function App() {
         voiceReplies={voiceReplies}
         voiceSupported={speech.isSupported}
         onToggleVoiceReplies={toggleVoiceReplies}
+        voiceSettings={
+          <VoiceSettings
+            voices={speech.voices}
+            voice={speech.voice}
+            onVoiceChange={speech.setVoice}
+            rate={speech.rate}
+            onRateChange={speech.setRate}
+            onTest={speech.speak}
+            disabled={!speech.isSupported}
+          />
+        }
         handsFree={handsFree}
         handsFreeSupported={handsFreeSession.isSupported}
         onToggleHandsFree={toggleHandsFree}

@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { ServerStatus } from '../hooks/useServerStatus';
 import { HeadsetIcon, PlusIcon, TrashIcon, VolumeIcon, VolumeOffIcon } from './icons';
 
@@ -15,6 +16,7 @@ interface HeaderProps {
   voiceReplies: boolean;
   voiceSupported: boolean;
   onToggleVoiceReplies: () => void;
+  voiceSettings: ReactNode;
   handsFree: boolean;
   handsFreeSupported: boolean;
   onToggleHandsFree: () => void;
@@ -28,6 +30,7 @@ export function Header({
   voiceReplies,
   voiceSupported,
   onToggleVoiceReplies,
+  voiceSettings,
   handsFree,
   handsFreeSupported,
   onToggleHandsFree,
@@ -85,6 +88,7 @@ export function Header({
         >
           {voiceReplies && voiceSupported ? <VolumeIcon /> : <VolumeOffIcon />}
         </button>
+        {voiceSettings}
         <button
           type="button"
           className="btn btn--ghost"
