@@ -1,0 +1,18 @@
+{
+  "name": "prime",
+  "version": "0.1.0",
+  "private": true,
+  "description": "P.R.I.M.E. - Personal Reasoning and Intelligent Machine Engine",
+  "packageManager": "pnpm@12.14.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "build": "pnpm -r build",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "typescript": "^7.0.2"
+  }
+}

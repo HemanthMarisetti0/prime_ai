@@ -1,0 +1,15 @@
+{
+  "name": "@prime/shared",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Types shared between the P.R.I.M.E. frontend and backend",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  }
+}
