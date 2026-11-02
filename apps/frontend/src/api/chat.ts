@@ -1,4 +1,4 @@
-import type { ApiErrorResponse, ChatMessage, ChatRequest, ChatResponse } from '@prime/shared';
+import type { ApiErrorResponse, ChatMessage, ChatRequest, ChatResponse, UserLocation } from '@prime/shared';
 import { API_BASE } from './config';
 
 const UNREACHABLE = 'My apologies, Sir. I cannot reach my server. Kindly check that the backend is running.';
@@ -16,9 +16,10 @@ export class ChatApiError extends Error {
 export async function sendChat(
   message: string,
   history: ChatMessage[],
+  location: UserLocation | null,
   signal?: AbortSignal,
 ): Promise<ChatResponse> {
-  const body: ChatRequest = { message, history };
+  const body: ChatRequest = { message, history, ...(location && { location }) };
 
   let res: Response;
   try {

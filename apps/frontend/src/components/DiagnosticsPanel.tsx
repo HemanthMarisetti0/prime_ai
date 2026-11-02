@@ -49,19 +49,19 @@ interface DiagnosticsPanelProps {
 
 export function DiagnosticsPanel({ snapshot, onRunDiagnostics, onClose, canRun }: DiagnosticsPanelProps) {
   const closeButton = (
-    <button type="button" className="hud-btn hud-btn--icon diag__close" onClick={onClose} aria-label="Hide diagnostics" title="Hide diagnostics">
+    <button type="button" className="hud-btn hud-btn--icon side-panel__close" onClick={onClose} aria-label="Hide diagnostics" title="Hide diagnostics">
       <CloseIcon />
     </button>
   );
 
   if (snapshot === null) {
     return (
-      <section className="diag panel" aria-label="System diagnostics">
-        <div className="diag__header">
+      <section className="side-panel panel" aria-label="System diagnostics">
+        <div className="side-panel__header">
           <span>System diagnostics</span>
           {closeButton}
         </div>
-        <p className="diag__empty">My apologies, Sir. Telemetry is unavailable at the moment.</p>
+        <p className="side-panel__empty">My apologies, Sir. Telemetry is unavailable at the moment.</p>
       </section>
     );
   }
@@ -71,10 +71,10 @@ export function DiagnosticsPanel({ snapshot, onRunDiagnostics, onClose, canRun }
   const batteryState = battery?.charging ? 'Charging' : battery?.pluggedIn ? 'Plugged in' : 'On battery';
 
   return (
-    <section className="diag panel" aria-label="System diagnostics">
-      <div className="diag__header">
+    <section className="side-panel panel" aria-label="System diagnostics">
+      <div className="side-panel__header">
         <span>System diagnostics</span>
-        <div className="diag__actions">
+        <div className="side-panel__actions">
           <button type="button" className="hud-btn diag__run" onClick={onRunDiagnostics} disabled={!canRun || !snapshot}>
             Full report
           </button>
@@ -83,7 +83,7 @@ export function DiagnosticsPanel({ snapshot, onRunDiagnostics, onClose, canRun }
       </div>
 
       {!snapshot ? (
-        <p className="diag__empty">Scanning your systems, Sir…</p>
+        <p className="side-panel__empty">Scanning your systems, Sir…</p>
       ) : (
         <div className="diag__grid">
           <Meter

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { ChatDisplay, ChatMessage, ChatRole } from '@prime/shared';
+import type { ChatDisplay, ChatMessage, ChatRole, NewsReport, UserLocation, WeatherReport } from '@prime/shared';
 import { sendChat } from '../api/chat';
 
 export interface UiMessage extends ChatMessage {
@@ -7,6 +7,8 @@ export interface UiMessage extends ChatMessage {
   createdAt: number;
   /** HUD panel the reply asked to show (e.g. system diagnostics). */
   display?: ChatDisplay;
+  weather?: WeatherReport;
+  news?: NewsReport;
 }
 
 // Mirror the backend validation limits (apps/backend/src/ai/dto/chat-request.dto.ts).
@@ -35,7 +37,7 @@ export function useChat() {
 
   /** Sends a message. Resolves false if it was not delivered, so the caller can restore the draft. */
   const send = useCallback(
-    async (text: string): Promise<boolean> => {
+    async (text: string, location: UserLocation | null = null): Promise<boolean> => {
       const content = text.trim();
       if (!content || pendingRef.current) return false;
 
@@ -51,8 +53,8 @@ export function useChat() {
       setIsLoading(true);
 
       try {
-        const { reply, display } = await sendChat(content, history, controller.signal);
-        setMessages((prev) => [...prev, { ...createMessage('assistant', reply), display }]);
+        const { reply, display, weather, news } = await sendChat(content, history, location, controller.signal);
+        setMessages((prev) => [...prev, { ...createMessage('assistant', reply), display, weather, news }]);
         return true;
       } catch (err) {
         if (controller.signal.aborted) return false;

@@ -7,17 +7,49 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { ApiError, GoogleGenAI, type Content } from '@google/genai';
-import type { ChatMessage, ChatResponse } from '@prime/shared';
+import { ApiError, GoogleGenAI, type Content, type FunctionCall, type FunctionDeclaration } from '@google/genai';
+import type { ChatMessage, ChatResponse, NewsReport, UserLocation, WeatherReport } from '@prime/shared';
 import { describeSnapshot, SystemService } from '../system/system.service';
+import { NewsService } from '../tools/news.service';
+import { WeatherService } from '../tools/weather.service';
 import { buildSystemInstruction, SYSTEM_DISPLAY_TAG } from './prime.persona';
 
 const DEFAULT_MODEL = 'gemini-2.5-flash';
 const REQUEST_TIMEOUT_MS = 30_000;
+// Upper bound on model <-> tool round trips per message.
+const MAX_TOOL_ROUNDS = 3;
 
 // Backup for the model's display tag: questions that are clearly about the machine.
 const SYSTEM_QUESTION =
-  /\b(cpu|processor|ram|memory usage|disk|storage|drive space|battery|gpu|graphics card|temperature|diagnos\w*|uptime|system (status|stats|health|report|check)|(pc|computer|laptop|machine)('s)? (status|health|performance|stats))\b/i;
+  /\b(cpu|processor|ram|memory usage|disk|storage|drive space|battery|gpu|graphics card|(cpu|gpu) temp\w*|diagnos\w*|uptime|system (status|stats|health|report|check)|(pc|computer|laptop|machine)('s)? (status|health|performance|stats))\b/i;
+
+const TOOLS: FunctionDeclaration[] = [
+  {
+    name: 'get_weather',
+    description: "Current weather and a 3-day forecast. Omit 'location' to use Sir's current location.",
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        location: { type: 'string', description: 'A place name such as "London" or "Mumbai, India".' },
+      },
+    },
+  },
+  {
+    name: 'get_news',
+    description: "Latest news headlines. Omit 'topic' for today's top stories.",
+    parametersJsonSchema: {
+      type: 'object',
+      properties: {
+        topic: { type: 'string', description: 'A short search topic such as "cricket" or "artificial intelligence".' },
+      },
+    },
+  },
+];
+
+interface ToolResults {
+  weather?: WeatherReport;
+  news?: NewsReport;
+}
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const DISPLAY_TAG_PATTERN = new RegExp(`\\s*${escapeRegExp(SYSTEM_DISPLAY_TAG)}\\s*`, 'g');
@@ -28,7 +60,11 @@ export class AiService {
   private readonly model = process.env.GEMINI_MODEL?.trim() || DEFAULT_MODEL;
   private readonly client: GoogleGenAI | null;
 
-  constructor(private readonly systemService: SystemService) {
+  constructor(
+    private readonly systemService: SystemService,
+    private readonly weatherService: WeatherService,
+    private readonly newsService: NewsService,
+  ) {
     const apiKey = process.env.GEMINI_API_KEY?.trim();
     if (!apiKey) {
       this.logger.warn('GEMINI_API_KEY is not set; /api/chat will return 503.');
@@ -38,22 +74,36 @@ export class AiService {
       : null;
   }
 
-  async chat(message: string, history: ChatMessage[]): Promise<ChatResponse> {
+  async chat(message: string, history: ChatMessage[], location?: UserLocation): Promise<ChatResponse> {
     if (!this.client) {
       throw new ServiceUnavailableException('My apologies, Sir. My AI link has not been configured yet.');
     }
 
     const telemetry = await this.getTelemetry();
-    const systemInstruction = buildSystemInstruction(telemetry);
+    const config = { systemInstruction: buildSystemInstruction(telemetry), tools: [{ functionDeclarations: TOOLS }] };
+    const contents = toGeminiContents(message, history);
+    const results: ToolResults = {};
 
     try {
-      const response = await this.client.models.generateContent({
-        model: this.model,
-        contents: toGeminiContents(message, history),
-        config: { systemInstruction },
-      });
+      let raw = '';
+      for (let round = 0; ; round++) {
+        const response = await this.client.models.generateContent({ model: this.model, contents, config });
+        const calls = response.functionCalls ?? [];
+        if (!calls.length || round === MAX_TOOL_ROUNDS) {
+          raw = response.text?.trim() ?? '';
+          break;
+        }
+        // Keep the model's turn verbatim (it carries thought signatures), then answer each call.
+        const modelTurn = response.candidates?.[0]?.content;
+        if (modelTurn) contents.push(modelTurn);
+        const parts = await Promise.all(
+          calls.map(async (call) => ({
+            functionResponse: { id: call.id, name: call.name, response: await this.runTool(call, location, results) },
+          })),
+        );
+        contents.push({ role: 'user', parts });
+      }
 
-      const raw = response.text?.trim() ?? '';
       const tagged = raw.includes(SYSTEM_DISPLAY_TAG);
       const reply = raw.replace(DISPLAY_TAG_PATTERN, ' ').trim();
       if (!reply) {
@@ -61,9 +111,38 @@ export class AiService {
       }
 
       const showSystem = Boolean(telemetry) && (tagged || SYSTEM_QUESTION.test(message));
-      return showSystem ? { reply, display: 'system' } : { reply };
+      return { reply, ...(showSystem && { display: 'system' as const }), ...results };
     } catch (error) {
       throw this.toHttpException(error);
+    }
+  }
+
+  /** Executes one tool call; failures are reported back to the model so it can apologise gracefully. */
+  private async runTool(
+    call: FunctionCall,
+    location: UserLocation | undefined,
+    results: ToolResults,
+  ): Promise<Record<string, unknown>> {
+    const args = (call.args ?? {}) as Record<string, unknown>;
+    const text = (value: unknown) => (typeof value === 'string' ? value : undefined);
+    try {
+      switch (call.name) {
+        case 'get_weather':
+          results.weather = await this.weatherService.getWeather(text(args.location), location);
+          return { output: results.weather };
+        case 'get_news': {
+          results.news = await this.newsService.getNews(text(args.topic));
+          // The model only needs headlines; links are shown on the display.
+          const { topic, items } = results.news;
+          return { output: { topic, headlines: items.map(({ title, source, publishedAt }) => ({ title, source, publishedAt })) } };
+        }
+        default:
+          return { error: `Unknown tool ${call.name}` };
+      }
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Tool ${call.name} failed: ${reason}`);
+      return { error: reason };
     }
   }
 

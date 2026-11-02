@@ -4,15 +4,21 @@ import { DiagnosticsPanel } from './components/DiagnosticsPanel';
 import { ErrorBanner } from './components/ErrorBanner';
 import { Header } from './components/Header';
 import { MessageList } from './components/MessageList';
+import { NewsPanel } from './components/NewsPanel';
 import { Reactor, type ReactorState } from './components/Reactor';
 import { VoiceSettings } from './components/VoiceSettings';
+import { WeatherPanel } from './components/WeatherPanel';
 import { useChat } from './hooks/useChat';
+import { useGeolocation } from './hooks/useGeolocation';
 import { useHandsFree } from './hooks/useHandsFree';
 import { useServerStatus } from './hooks/useServerStatus';
 import { useSpeechSynthesis } from './hooks/useSpeechSynthesis';
 import { useSystemStats } from './hooks/useSystemStats';
 
 const VOICE_REPLIES_KEY = 'prime.voiceReplies';
+
+const WEATHER_HINT =
+  /\b(weather|forecast|temperature|rain\w*|umbrella|sunny|cloudy|humid\w*|windy|snow\w*|storm\w*|degrees)\b/i;
 
 const STATE_LABEL: Record<ReactorState, string> = {
   connecting: 'Initialising',
@@ -63,13 +69,17 @@ export default function App() {
   const { send, clearConversation, newConversation, dismissError } = chat;
   const { stop: stopSpeaking } = speech;
 
+  const { getLocation, knownLocation } = useGeolocation();
+
   const handleSend = useCallback(
-    (text: string) => {
+    async (text: string) => {
       stopSpeaking();
       setVoiceError(null);
-      return send(text);
+      // Ask for location only once weather comes up; afterwards it is reused for the session.
+      const location = knownLocation() ?? (WEATHER_HINT.test(text) ? await getLocation() : null);
+      return send(text, location);
     },
-    [send, stopSpeaking],
+    [send, stopSpeaking, getLocation, knownLocation],
   );
 
   const handleClear = () => {
@@ -138,6 +148,19 @@ export default function App() {
       : latestReply?.display === 'system';
   const toggleDiagnostics = () => setDiagnosticsOverride({ replyId: latestReply?.id, open: !showDiagnostics });
 
+  // Weather and news panels show with the reply that fetched them, until closed or superseded.
+  const [closedPanels, setClosedPanels] = useState<{ replyId?: string; panels: ('weather' | 'news')[] }>({ panels: [] });
+  const isClosed = (panel: 'weather' | 'news') =>
+    closedPanels.replyId === latestReply?.id && closedPanels.panels.includes(panel);
+  const closePanel = (panel: 'weather' | 'news') =>
+    setClosedPanels((prev) => ({
+      replyId: latestReply?.id,
+      panels: prev.replyId === latestReply?.id ? [...prev.panels, panel] : [panel],
+    }));
+  const weatherReport = isClosed('weather') ? undefined : latestReply?.weather;
+  const newsReport = isClosed('news') ? undefined : latestReply?.news;
+  const hasSidePanel = showDiagnostics || Boolean(weatherReport) || Boolean(newsReport);
+
   const coreActionLabel = handsFree
     ? 'End voice link'
     : speech.isSpeaking
@@ -180,7 +203,7 @@ export default function App() {
       />
 
       <main className="hud__body">
-        <div className={`hud__left${showDiagnostics ? ' hud__left--diagnostics' : ''}`}>
+        <div className={`hud__left${hasSidePanel ? ' hud__left--panels' : ''}`}>
           <section className={`core-panel panel core-panel--${reactorState}`} aria-label="Assistant core">
             <div className="core-panel__scan" aria-hidden="true" />
             <Reactor
@@ -208,6 +231,8 @@ export default function App() {
               onClose={toggleDiagnostics}
             />
           )}
+          {weatherReport && <WeatherPanel report={weatherReport} onClose={() => closePanel('weather')} />}
+          {newsReport && <NewsPanel report={newsReport} onClose={() => closePanel('news')} />}
         </div>
 
         <section className="comms panel" aria-label="Conversation">

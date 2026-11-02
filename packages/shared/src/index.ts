@@ -8,9 +8,47 @@ export interface ChatMessage {
   content: string;
 }
 
+export interface UserLocation {
+  latitude: number;
+  longitude: number;
+  /** Human-readable place name, if known. */
+  label?: string;
+}
+
 export interface ChatRequest {
   message: string;
   history: ChatMessage[];
+  /** Sir's current location, used for weather when no place is named. */
+  location?: UserLocation;
+}
+
+export interface WeatherReport {
+  location: string;
+  updatedAt: string;
+  current: {
+    temperatureC: number;
+    feelsLikeC: number;
+    humidityPercent: number;
+    windKph: number;
+    precipitationMm: number;
+    condition: string;
+    isDay: boolean;
+  };
+  daily: { date: string; condition: string; maxC: number; minC: number; rainChancePercent: number | null }[];
+}
+
+export interface NewsItem {
+  title: string;
+  source: string;
+  url: string;
+  publishedAt: string;
+}
+
+export interface NewsReport {
+  /** Search topic, or null for top stories. */
+  topic: string | null;
+  region: string;
+  items: NewsItem[];
 }
 
 /** Extra HUD panels the frontend should show alongside a reply. */
@@ -19,6 +57,8 @@ export type ChatDisplay = 'system';
 export interface ChatResponse {
   reply: string;
   display?: ChatDisplay;
+  weather?: WeatherReport;
+  news?: NewsReport;
 }
 
 export interface HealthResponse {
