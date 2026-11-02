@@ -1,0 +1,28 @@
+{
+  "name": "@prime/backend",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "tsc && pnpm run \"/^dev:/\"",
+    "dev:tsc": "tsc --watch --preserveWatchOutput",
+    "dev:node": "node --env-file-if-exists=.env --watch dist/main.js",
+    "build": "tsc",
+    "start": "node --env-file-if-exists=.env dist/main.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@nestjs/common": "^12.3.2",
+    "@nestjs/core": "^12.3.2",
+    "@nestjs/platform-express": "^12.3.2",
+    "@prime/shared": "workspace:*",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.2"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6",
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  }
+}
