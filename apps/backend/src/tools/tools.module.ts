@@ -4,10 +4,11 @@ import { DirectionsService } from './directions.service';
 import { GeoService } from './geo.service';
 import { NewsService } from './news.service';
 import { PersonService } from './person.service';
+import { OwnerProfileService } from './owner-profile.service';
 import { WeatherService } from './weather.service';
 import { YouTubeService } from './youtube.service';
 
-const SERVICES = [WeatherService, NewsService, YouTubeService, GeoService, DirectionsService, CurrencyService, PersonService];
+const SERVICES = [WeatherService, NewsService, YouTubeService, GeoService, DirectionsService, CurrencyService, PersonService, OwnerProfileService];
 
 @Module({
   providers: SERVICES,

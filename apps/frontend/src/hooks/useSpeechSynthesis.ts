@@ -76,6 +76,8 @@ export function useSpeechSynthesis() {
   const generationRef = useRef(0);
   // Chrome can garbage-collect queued utterances and skip their `end` event; keep them referenced.
   const utterancesRef = useRef<SpeechSynthesisUtterance[]>([]);
+  // Utterances queued but not yet finished in the current generation.
+  const pendingRef = useRef(0);
 
   useEffect(() => {
     if (!synth) return;
@@ -97,36 +99,53 @@ export function useSpeechSynthesis() {
   const stop = useCallback(() => {
     if (!synth) return;
     generationRef.current++;
+    pendingRef.current = 0;
     synth.cancel();
     setIsSpeaking(false);
   }, []);
 
-  const speak = useCallback((text: string) => {
+  /**
+   * Queues text to be spoken after anything already queued (used while a reply streams in).
+   * `fresh` cancels what is currently being said first.
+   */
+  const enqueue = useCallback((text: string, fresh = false) => {
     if (!synth) return;
     const chunks = splitIntoChunks(toSpeakableText(text));
     if (!chunks.length) return;
 
-    const generation = ++generationRef.current;
-    synth.cancel();
+    if (fresh) {
+      generationRef.current++;
+      synth.cancel();
+      utterancesRef.current = [];
+      pendingRef.current = 0;
+    }
+    const generation = generationRef.current;
     const isCurrent = () => generation === generationRef.current;
+    const finishOne = () => {
+      if (!isCurrent()) return;
+      pendingRef.current = Math.max(0, pendingRef.current - 1);
+      if (pendingRef.current === 0) setIsSpeaking(false);
+    };
     // Mark as speaking immediately (not on audio start) so hands-free mode never opens the mic in between.
     setIsSpeaking(true);
 
-    utterancesRef.current = chunks.map((chunk, index) => {
+    for (const chunk of chunks) {
       const utterance = new SpeechSynthesisUtterance(chunk);
       if (voiceRef.current) {
         utterance.voice = voiceRef.current;
         utterance.lang = voiceRef.current.lang;
       }
       utterance.rate = rateRef.current;
-      if (index === chunks.length - 1) {
-        utterance.onend = () => isCurrent() && setIsSpeaking(false);
-      }
-      utterance.onerror = () => isCurrent() && setIsSpeaking(false);
+      utterance.onend = finishOne;
+      utterance.onerror = finishOne;
+      pendingRef.current++;
+      utterancesRef.current.push(utterance);
       synth.speak(utterance);
-      return utterance;
-    });
+    }
   }, []);
+
+  /** Speaks text, interrupting anything currently being said. */
+  const speak = useCallback((text: string) => enqueue(text, true), [enqueue]);
 
   const setVoice = useCallback((voiceURI: string) => {
     setSavedVoiceURI(voiceURI);
@@ -142,6 +161,7 @@ export function useSpeechSynthesis() {
     isSupported: isSpeechSynthesisSupported,
     isSpeaking,
     speak,
+    enqueue,
     stop,
     voices,
     voice,

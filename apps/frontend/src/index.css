@@ -210,7 +210,8 @@ select {
   color: var(--green);
 }
 
-.readout--checking .readout__value {
+.readout--checking .readout__value,
+.readout--waking .readout__value {
   color: var(--amber);
 }
 
@@ -2329,40 +2330,6 @@ select {
 }
 
 /* ---------- Quick actions ---------- */
-.quick-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  padding: 0 20px 12px;
-  animation: message-in 0.3s ease-out 0.15s both;
-}
-
-.quick-actions__chip {
-  padding: 7px 14px;
-  border: 1px solid var(--line-strong);
-  background: rgb(0 212 255 / 0.05);
-  color: var(--cyan-soft);
-  font-family: var(--font-hud);
-  font-size: 0.82rem;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  cursor: pointer;
-  clip-path: polygon(6px 0, 100% 0, 100% calc(100% - 6px), calc(100% - 6px) 100%, 0 100%, 0 6px);
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
-}
-
-.quick-actions__chip:not(:disabled):hover {
-  color: var(--cyan);
-  border-color: var(--cyan);
-  background: rgb(0 212 255 / 0.12);
-}
-
-.quick-actions__chip:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
 /* ---------- Overflow menu (phones) ---------- */
 .topbar__menu {
   position: relative;
@@ -2559,21 +2526,6 @@ select {
   }
 
   /* Chips scroll sideways instead of stacking. */
-  .quick-actions {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    padding: 0 12px 10px;
-    scrollbar-width: none;
-  }
-
-  .quick-actions::-webkit-scrollbar {
-    display: none;
-  }
-
-  .quick-actions__chip {
-    flex-shrink: 0;
-  }
-
   /* Composer. */
   .composer {
     padding: 8px 8px 8px;
@@ -2671,4 +2623,448 @@ select {
   color: var(--text-faint);
   font-size: 0.62rem;
   letter-spacing: 0.12em;
+}
+
+/* ---------- Quick actions (fresh conversation) ---------- */
+.quick-actions {
+  padding: 0 20px 14px;
+}
+
+.quick-actions__title {
+  margin: 0 0 10px;
+  font-family: var(--font-hud);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  animation: message-in 0.3s ease-out 0.1s both;
+}
+
+.quick-actions__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.quick-actions__card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 14px;
+  text-align: left;
+  border: 1px solid var(--line);
+  background: linear-gradient(135deg, rgb(0 212 255 / 0.07), rgb(0 212 255 / 0.015) 60%);
+  color: var(--text);
+  cursor: pointer;
+  clip-path: polygon(10px 0, 100% 0, 100% calc(100% - 10px), calc(100% - 10px) 100%, 0 100%, 0 10px);
+  animation: message-in 0.35s ease-out both;
+  transition: border-color 0.2s, background 0.2s, transform 0.2s;
+}
+
+.quick-actions__card:not(:disabled):hover,
+.quick-actions__card:focus-visible {
+  border-color: var(--cyan);
+  background: linear-gradient(135deg, rgb(0 212 255 / 0.16), rgb(0 212 255 / 0.03) 70%);
+  transform: translateY(-1px);
+  outline: none;
+}
+
+.quick-actions__card:not(:disabled):active {
+  transform: translateY(0) scale(0.99);
+}
+
+.quick-actions__card:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.quick-actions__icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  color: var(--cyan);
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(0 212 255 / 0.18), transparent 70%);
+  box-shadow: 0 0 14px rgb(0 212 255 / 0.15);
+}
+
+.quick-actions__card:not(:disabled):hover .quick-actions__icon {
+  box-shadow: 0 0 18px var(--cyan-glow);
+}
+
+.quick-actions__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.quick-actions__label {
+  font-family: var(--font-hud);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cyan-soft);
+}
+
+.quick-actions__hint {
+  overflow: hidden;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 1100px) {
+  .quick-actions__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .quick-actions {
+    padding: 0 12px 10px;
+  }
+
+  .quick-actions__grid {
+    gap: 8px;
+  }
+
+  .quick-actions__card {
+    gap: 10px;
+    padding: 10px;
+  }
+
+  .quick-actions__icon {
+    width: 32px;
+    height: 32px;
+  }
+
+  .quick-actions__icon svg {
+    width: 17px;
+    height: 17px;
+  }
+
+  .quick-actions__label {
+    font-size: 0.85rem;
+  }
+
+  .quick-actions__hint {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    font-size: 0.72rem;
+    line-height: 1.3;
+    white-space: normal;
+  }
+}
+
+/* ---------- Streaming replies ---------- */
+.processing__text {
+  letter-spacing: 0.16em;
+}
+
+.message--streaming .message__body {
+  border-left-color: var(--cyan-soft);
+  box-shadow: -6px 0 16px -10px var(--cyan-glow);
+}
+
+/* The caret sits at the end of the text being written. */
+.message__body .formatted:has(+ .message__caret),
+.message__body .formatted:has(+ .message__caret) > :last-child {
+  display: inline;
+}
+
+.message__caret {
+  display: inline-block;
+  width: 0.5em;
+  height: 1.05em;
+  margin-left: 3px;
+  vertical-align: -0.15em;
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan-glow);
+  animation: caret 0.9s steps(1) infinite;
+}
+
+@keyframes caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+.message__stopped {
+  display: block;
+  margin-top: 6px;
+  font-family: var(--font-hud);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.message__copy {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s, color 0.2s;
+}
+
+.message:hover .message__copy,
+.message__copy:focus-visible,
+.message__copy.is-copied {
+  opacity: 1;
+}
+
+.message__copy:hover,
+.message__copy.is-copied {
+  color: var(--cyan);
+}
+
+@media (hover: none) {
+  .message__copy {
+    opacity: 0.7;
+  }
+}
+
+.message--assistant .message__meta {
+  align-self: stretch;
+}
+
+.icon-btn--primary.icon-btn--halt {
+  color: #1f1200;
+  background: linear-gradient(135deg, #ffd796, var(--amber));
+  animation: halt-pulse 1.6s ease-in-out infinite;
+}
+
+.icon-btn--primary.icon-btn--halt:hover {
+  filter: brightness(1.12);
+}
+
+@keyframes halt-pulse {
+  50% {
+    opacity: 0.72;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .message__caret,
+  .icon-btn--halt,
+  .quick-actions__card,
+  .quick-actions__title {
+    animation: none;
+  }
+}
+
+.message__model + .message__copy {
+  margin-left: 4px;
+}
+
+/* ---------- Settings: About you ---------- */
+.settings__panel {
+  max-height: min(78vh, 640px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.settings__title--section {
+  margin-top: 6px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.settings__about {
+  width: 100%;
+  min-height: 110px;
+  padding: 8px 10px;
+  resize: vertical;
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  line-height: 1.45;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.settings__about:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 1px var(--cyan-glow);
+}
+
+.settings__about::placeholder {
+  color: var(--text-faint);
+}
+
+@media (max-width: 640px) {
+  /* A blurred ancestor would trap the fixed bottom sheet inside the top bar. */
+  .topbar:has(.settings__panel) {
+    backdrop-filter: none;
+    background-color: var(--panel-solid);
+  }
+
+  .settings__panel {
+    max-height: calc(100dvh - 24px);
+  }
+}
+
+
+/* ---------- Sir's own pages (portfolio, GitHub, LinkedIn) ---------- */
+.link-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.link-panel--inside {
+  flex: 1 0 auto;
+}
+
+.link-panel__frame {
+  width: 100%;
+  height: min(62vh, 640px);
+  border: 1px solid var(--line-strong);
+  background: #fff;
+}
+
+.link-panel__note {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--text);
+}
+
+.link-panel__actions {
+  display: flex;
+  gap: 8px;
+}
+
+.link-panel__actions .hud-btn {
+  flex: 1;
+  justify-content: center;
+  text-align: center;
+  text-decoration: none;
+}
+
+.link-panel__tab.is-urgent {
+  border-color: var(--amber);
+  color: var(--amber);
+}
+
+@media (max-width: 640px) {
+  .link-panel__frame {
+    height: 55vh;
+  }
+}
+
+/* ---------- Email draft ---------- */
+.email-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.email-panel__to {
+  display: flex;
+  gap: 10px;
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.email-panel__to dt {
+  font-family: var(--font-hud);
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.email-panel__to dd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+
+.email-panel__recipient {
+  padding: 1px 8px;
+  border: 1px solid var(--line-strong);
+  background: rgb(0 212 255 / 0.06);
+}
+
+.email-panel__address {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.email-panel__body {
+  min-height: 160px;
+}
+
+.email-panel__send {
+  border-color: var(--cyan) !important;
+  color: var(--cyan) !important;
+}
+
+/* Single-line text fields in panels (e.g. the email subject). */
+.settings__input {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.settings__input:focus {
+  outline: none;
+  border-color: var(--cyan);
+  box-shadow: 0 0 0 1px var(--cyan-glow);
+}
+
+/* Email: states and error (the import-form error style was removed with that form). */
+.email-panel__error {
+  margin: 0;
+  padding: 8px 10px;
+  border-left: 2px solid var(--red);
+  background: rgb(255 92 92 / 0.1);
+  color: #ffc9c9;
+  font-size: 0.8rem;
+}
+
+.email-panel__done {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 2px solid var(--green);
+  background: rgb(60 255 180 / 0.08);
+  color: var(--green);
+  font-weight: 600;
+}
+
+.email-panel--sent .email-panel__body,
+.email-panel--sent .settings__input,
+.email-panel--discarded .email-panel__body,
+.email-panel--discarded .settings__input {
+  opacity: 0.7;
+}
+
+.email-panel__copy {
+  flex: 0 0 auto !important;
 }

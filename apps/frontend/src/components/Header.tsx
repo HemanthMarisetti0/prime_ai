@@ -22,6 +22,7 @@ export interface Account {
 
 const LINK_LABEL: Record<ServerStatus, string> = {
   checking: 'Linking',
+  waking: 'Waking',
   online: 'Online',
   offline: 'Offline',
 };
@@ -218,11 +219,10 @@ export function Header({
                 type="button"
                 role="menuitem"
                 className="menu__item"
-                disabled={!voiceSupported}
                 onClick={() => runAndClose(onOpenVoiceSettings)}
               >
                 <SettingsIcon />
-                Voice settings
+                About you &amp; voice
               </button>
               <button
                 type="button"

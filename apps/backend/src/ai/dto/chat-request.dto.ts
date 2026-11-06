@@ -21,6 +21,7 @@ import type {
   ChatRole,
   MediaState,
   UserLocation,
+  UserProfile,
 } from '@prime/shared';
 
 export const MAX_MESSAGE_LENGTH = 4000;
@@ -73,6 +74,22 @@ export class ChatImageDto implements ChatImage {
   data: string;
 }
 
+export const MAX_ABOUT_LENGTH = 2000;
+
+export class UserProfileDto implements UserProfile {
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(120)
+  name?: string;
+
+  @IsOptional()
+  @Transform(trim)
+  @IsString()
+  @MaxLength(MAX_ABOUT_LENGTH)
+  about?: string;
+}
+
 export class ChatRequestDto implements ChatRequest {
   @Transform(trim)
   @IsString()
@@ -100,4 +117,9 @@ export class ChatRequestDto implements ChatRequest {
   @ValidateNested()
   @Type(() => ChatImageDto)
   image?: ChatImageDto;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => UserProfileDto)
+  profile?: UserProfileDto;
 }

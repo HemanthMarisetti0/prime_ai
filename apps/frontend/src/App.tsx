@@ -4,7 +4,9 @@ import { BootSequence } from './components/BootSequence';
 import { ChatInput } from './components/ChatInput';
 import { DiagnosticsPanel } from './components/DiagnosticsPanel';
 import { DirectionsPanel } from './components/DirectionsPanel';
+import { EmailPanel } from './components/EmailPanel';
 import { ErrorBanner } from './components/ErrorBanner';
+import { LinkPanel } from './components/LinkPanel';
 import { Header, type Account } from './components/Header';
 import { MessageList } from './components/MessageList';
 import { NewsPanel } from './components/NewsPanel';
@@ -19,6 +21,10 @@ import { VOLUME_STEP, YouTubePanel, type MediaControls, type MediaSession } from
 import { PcControlError } from './api/pc';
 import { parseMediaCommand, type MediaCommand } from './media/commands';
 import { parsePcCommand } from './pc/commands';
+import { describeOpen, parseOwnerPageCommand, parseWhereAnswer, toOwnerLink } from './owner/pages';
+import { GmailError, grantGmailPermission, hasGmailPermission, sendGmail } from './email/gmail';
+import type { EmailDraft } from '@prime/shared';
+import type { UiMessage } from './hooks/useChat';
 import { runPcCommand } from './pc/runPcCommand';
 import type { AttachedImage } from './media/image';
 import { useChat } from './hooks/useChat';
@@ -36,7 +42,7 @@ const VOICE_REPLIES_KEY = 'prime.voiceReplies';
 const LOCATION_HINT =
   /\b(weather|forecast|temperature|rain\w*|umbrella|sunny|cloudy|humid\w*|windy|snow\w*|storm\w*|degrees|near me|nearby|nearest|closest|around here|directions?|route|navigate|how far|how long (does it take|to get|to reach)|get to|take me to|way to)\b/i;
 
-type InfoPanel = 'weather' | 'news' | 'places' | 'directions' | 'trip' | 'person';
+type InfoPanel = 'weather' | 'news' | 'places' | 'directions' | 'trip' | 'person' | 'link' | 'email';
 
 const STATE_LABEL: Record<ReactorState, string> = {
   connecting: 'Initialising',
@@ -48,6 +54,15 @@ const STATE_LABEL: Record<ReactorState, string> = {
 };
 
 const WAKE_WORD_KEY = 'prime.wakeWord';
+const ABOUT_ME_KEY = 'prime.aboutMe';
+
+function loadText(key: string): string {
+  try {
+    return localStorage.getItem(key) ?? '';
+  } catch {
+    return '';
+  }
+}
 const BOOTED_KEY = 'prime.booted';
 
 /** Play the boot sequence once per browser session, and never for reduced-motion users. */
@@ -79,6 +94,30 @@ function saveFlag(key: string, value: boolean) {
 
 const loadVoiceReplies = () => loadFlag(VOICE_REPLIES_KEY, true);
 
+// Sir's answer to "Shall I send it?" (typed or spoken). Anything else goes to the AI, e.g. edits.
+const CONFIRM_SEND =
+  /^(?:(?:yes|yeah|yep|yup|sure|ok|okay|alright|right|correct|perfect|great|fine|please|prime|sir)[\s,.!]*)*(?:(?:yes|yeah|yep|sure|ok|okay)|(?:go ahead|send|send it|send now|send it now|send the (?:e-?)?mail|confirm(?:ed)?|do it|looks good|that'?s fine))(?:[\s,.!]*(?:please|now|sir|prime|thanks|thank you))*[\s.!]*$/i;
+const CANCEL_SEND =
+  /^(?:(?:no|nope|nah|please|prime|sir)[\s,.!]*)*(?:no|nope|don'?t send(?: it)?|do not send(?: it)?|cancel(?: it)?|discard(?: it)?|never ?mind|forget it|stop)(?:[\s,.!]*(?:please|thanks|sir|prime))*[\s.!]*$/i;
+
+const recipientNames = (draft: EmailDraft) => draft.to.map((r) => r.name ?? r.email).join(' and ');
+
+/**
+ * End of the text that is safe to speak while a reply is still streaming: the last complete
+ * sentence or line after `from`, never inside an unfinished code block.
+ */
+function speakableEnd(text: string, from: number): number {
+  const fences = text.match(/```/g)?.length ?? 0;
+  const limit = fences % 2 ? text.lastIndexOf('```') : text.length;
+  let end = from;
+  const boundary = /[.!?](?=\s)|\n/g;
+  boundary.lastIndex = from;
+  for (let match = boundary.exec(text); match && match.index < limit; match = boundary.exec(text)) {
+    end = match.index + 1;
+  }
+  return end;
+}
+
 interface AppProps {
   /** Signed-in user, or null when sign-in is disabled (local development without Firebase). */
   account: Account | null;
@@ -91,29 +130,61 @@ export default function App({ account, onSignOut }: AppProps) {
   const speech = useSpeechSynthesis();
   const [voiceReplies, setVoiceReplies] = useState(loadVoiceReplies);
   const [voiceError, setVoiceError] = useState<string | null>(null);
-  const lastHandledReplyRef = useRef<string | null>(null);
+  // How much of the latest reply has been handed to speech; `done` once it is fully spoken or silenced.
+  const spokenRef = useRef<{ id: string; length: number; done: boolean } | null>(null);
+  const { enqueue: enqueueSpeech, stop: stopSpeech } = speech;
 
-  // Speak each new reply (an assistant message that answers a user message, not the greeting).
+  // Speak each new reply (an assistant message that answers a user message, not the greeting),
+  // sentence by sentence while it is still streaming in.
   useEffect(() => {
     const last = chat.messages.at(-1);
     const previous = chat.messages.at(-2);
     if (!last || last.role !== 'assistant' || previous?.role !== 'user') return;
-    if (lastHandledReplyRef.current === last.id) return;
-    lastHandledReplyRef.current = last.id;
-    if (voiceReplies) speech.speak(last.content);
-  }, [chat.messages, voiceReplies, speech.speak]);
+    if (spokenRef.current?.id !== last.id) spokenRef.current = { id: last.id, length: 0, done: !voiceReplies };
+    const progress = spokenRef.current;
+    if (progress.done) return;
+
+    const text = last.content;
+    if (text.length < progress.length) {
+      // The reply was rewritten (e.g. another model took over): start again.
+      stopSpeech();
+      progress.length = 0;
+    }
+    const end = last.streaming ? speakableEnd(text, progress.length) : text.length;
+    if (end > progress.length) {
+      enqueueSpeech(text.slice(progress.length, end), progress.length === 0);
+      progress.length = end;
+    }
+    if (!last.streaming) progress.done = true;
+  }, [chat.messages, voiceReplies, enqueueSpeech, stopSpeech]);
 
   const toggleVoiceReplies = () => {
     const next = !voiceReplies;
     setVoiceReplies(next);
-    if (!next) speech.stop();
+    if (!next) stopSpeaking();
     saveFlag(VOICE_REPLIES_KEY, next);
   };
 
   const { send, clearConversation, newConversation, dismissError, addLocalExchange } = chat;
-  const { stop: stopSpeaking } = speech;
+  /** Silences P.R.I.M.E., including the rest of a reply that is still arriving. */
+  const stopSpeaking = useCallback(() => {
+    if (spokenRef.current) spokenRef.current.done = true;
+    stopSpeech();
+  }, [stopSpeech]);
 
   const { getLocation, knownLocation } = useGeolocation();
+
+  // What Sir has told P.R.I.M.E. about himself (Settings → About you).
+  const [aboutMe, setAboutMe] = useState(() => loadText(ABOUT_ME_KEY));
+  const changeAboutMe = useCallback((text: string) => {
+    setAboutMe(text);
+    try {
+      localStorage.setItem(ABOUT_ME_KEY, text);
+    } catch {
+      // Simply won't persist.
+    }
+  }, []);
+  const accountName = account?.name ?? null;
 
   // YouTube player session: started by replies that searched YouTube, kept across the conversation.
   const [mediaSession, setMediaSession] = useState<MediaSession | null>(null);
@@ -183,12 +254,75 @@ export default function App({ account, onSignOut }: AppProps) {
     }
   };
 
+  // Sir's edits to the draft on display, so a spoken "send it" sends what he sees.
+  const draftEditsRef = useRef<Record<string, Pick<EmailDraft, 'subject' | 'body'>>>({});
+
+  /**
+   * Sends a confirmed draft from Sir's Gmail and returns P.R.I.M.E.'s spoken result. Only ever
+   * called after Sir's explicit confirmation (the Send button, or "yes, send it").
+   */
+  const sendEmail = useCallback(
+    async (message: UiMessage): Promise<string> => {
+      const draft = message.email;
+      if (!draft) return 'There is no email waiting to be sent, Sir.';
+      const edits = draftEditsRef.current[message.id];
+      const email = { ...draft, ...edits };
+      const names = recipientNames(draft);
+      chat.updateMessage(message.id, { emailStatus: 'sending', emailError: undefined });
+      try {
+        // Google asks once (in a window) before P.R.I.M.E. may send; this needs Sir's click or key press.
+        if (!hasGmailPermission()) await grantGmailPermission();
+        await sendGmail(email);
+        chat.updateMessage(message.id, { emailStatus: 'sent', email });
+        return `Done, Sir. Your email to ${names} has been sent.`;
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : 'The email could not be sent, Sir.';
+        const needsClick = error instanceof GmailError && error.needsPermission;
+        // Back to awaiting confirmation, so Sir can simply try again.
+        chat.updateMessage(message.id, { emailStatus: undefined, emailError: reason });
+        return needsClick ? `${reason} Tap Send on the draft and I will send it straight away.` : `${reason} Nothing was sent.`;
+      }
+    },
+    [chat.updateMessage],
+  );
+
   const handleSend = useCallback(
     async (text: string, image?: AttachedImage) => {
       stopSpeaking();
       setVoiceError(null);
 
       if (!image) {
+        // "Yes, send it" / "cancel" for an email draft awaiting confirmation: handled here, never by the AI.
+        const draftReply = chat.messages.findLast((m) => m.role === 'assistant');
+        if (draftReply?.email && !draftReply.emailStatus) {
+          if (CONFIRM_SEND.test(text.trim())) {
+            addLocalExchange(text, await sendEmail(draftReply));
+            return true;
+          }
+          if (CANCEL_SEND.test(text.trim())) {
+            chat.updateMessage(draftReply.id, { emailStatus: 'discarded' });
+            addLocalExchange(text, 'Very well, Sir. The email has been discarded; nothing was sent.');
+            return true;
+          }
+        }
+
+        // "Open my GitHub / portfolio / LinkedIn": instant, and the tab opens from Sir's own keypress.
+        const pageCommand = parseOwnerPageCommand(text);
+        if (pageCommand) {
+          const link = toOwnerLink(pageCommand.site, pageCommand.where);
+          addLocalExchange(text, describeOpen(link, pageCommand.where), { link });
+          return true;
+        }
+        // Answer to "here or in a new tab?" for a page that is waiting on that choice.
+        const lastReply = chat.messages.at(-1);
+        const pending = lastReply?.role === 'assistant' && lastReply.link?.open === null ? lastReply.link : null;
+        const where = pending ? parseWhereAnswer(text) : null;
+        if (pending && where) {
+          const link = toOwnerLink(pending.site, where);
+          addLocalExchange(text, describeOpen(link, where), { link });
+          return true;
+        }
+
         // Playback commands are handled instantly in the browser, without the AI.
         const command = mediaSession?.current ? parseMediaCommand(text) : null;
         if (command && mediaSession) {
@@ -214,10 +348,11 @@ export default function App({ account, onSignOut }: AppProps) {
       // Ask for location only once weather comes up; afterwards it is reused for the session.
       const location = knownLocation() ?? (LOCATION_HINT.test(text) ? await getLocation() : null);
       const media = mediaSession?.current ? { title: mediaSession.current.title, playing: mediaPlaying } : null;
-      return send(text, { location, media, image });
+      const profile = { name: accountName ?? undefined, about: aboutMe.trim() || undefined };
+      return send(text, { location, media, image, profile });
     },
     // runMediaCommand only touches stable refs/setters plus mediaSession, which is listed.
-    [send, stopSpeaking, getLocation, knownLocation, mediaSession, mediaPlaying, addLocalExchange],
+    [send, stopSpeaking, getLocation, knownLocation, mediaSession, mediaPlaying, addLocalExchange, accountName, aboutMe, chat.messages, chat.updateMessage, sendEmail],
   );
 
   const handleClear = () => {
@@ -273,7 +408,7 @@ export default function App({ account, onSignOut }: AppProps) {
           ? 'thinking'
           : speech.isSpeaking
             ? 'speaking'
-            : serverStatus === 'checking'
+            : serverStatus === 'checking' || serverStatus === 'waking'
               ? 'connecting'
               : 'standby';
 
@@ -289,10 +424,15 @@ export default function App({ account, onSignOut }: AppProps) {
 
   const coreHint = (() => {
     if (reactorState === 'offline') return 'My apologies, Sir. I cannot reach my server.';
+    if (serverStatus === 'waking')
+      return 'Waking my server, Sir. After a rest the first start can take up to a minute.';
     if (!handsFreeSession.isSupported) return 'The voice link requires Chrome or Edge, Sir.';
     if (reactorState === 'listening')
       return handsFreeSession.transcript || 'I am listening, Sir. Say “stop listening” whenever you wish.';
-    if (reactorState === 'thinking') return 'One moment, Sir…';
+    if (reactorState === 'thinking') {
+      const pending = chat.messages.at(-1);
+      return pending?.streaming && pending.status ? `${pending.status}, Sir…` : 'One moment, Sir…';
+    }
     if (reactorState === 'speaking')
       return handsFree ? 'Tap the core whenever you wish to end the voice link.' : 'Tap the core should you wish me to stop.';
     if (handsFree) return 'Voice link engaged. I am at your service, Sir.';
@@ -327,9 +467,20 @@ export default function App({ account, onSignOut }: AppProps) {
   const directionsResult = isClosed('directions') ? undefined : latestReply?.directions;
   const tripPlan = isClosed('trip') ? undefined : latestReply?.trip;
   const personProfile = isClosed('person') ? undefined : latestReply?.person;
+  const ownerLink = isClosed('link') ? undefined : latestReply?.link;
+  // The draft stays on display (and confirmable) after "yes, send it" adds a short local reply.
+  const emailMessage = isClosed('email')
+    ? undefined
+    : (() => {
+        const replies = chat.messages.filter((m) => m.role === 'assistant');
+        const last = replies.at(-1);
+        if (last?.email) return last;
+        const previous = replies.at(-2);
+        return previous?.email && previous.emailStatus !== 'discarded' ? previous : undefined;
+      })();
   const hasSidePanel =
     showDiagnostics ||
-    Boolean(mediaSession || weatherReport || newsReport || placesResult || directionsResult || tripPlan || personProfile);
+    Boolean(mediaSession || weatherReport || newsReport || placesResult || directionsResult || tripPlan || personProfile || ownerLink || emailMessage);
 
   // Lower the music while P.R.I.M.E. speaks or listens.
   const mediaDucked = speech.isSpeaking || handsFreeSession.phase === 'listening';
@@ -387,6 +538,9 @@ export default function App({ account, onSignOut }: AppProps) {
             onRateChange={speech.setRate}
             onTest={speech.speak}
             disabled={!speech.isSupported}
+            aboutMe={aboutMe}
+            onAboutMeChange={changeAboutMe}
+            accountName={accountName}
             open={voiceSettingsOpen}
             onOpenChange={setVoiceSettingsOpen}
           />
@@ -451,6 +605,23 @@ export default function App({ account, onSignOut }: AppProps) {
               onClose={toggleDiagnostics}
             />
           )}
+          {emailMessage?.email && (
+            <EmailPanel
+              key={emailMessage.id}
+              draft={emailMessage.email}
+              status={emailMessage.emailStatus}
+              error={emailMessage.emailError}
+              onEdit={(edits) => (draftEditsRef.current[emailMessage.id] = edits)}
+              onSend={async () => {
+                stopSpeaking();
+                const result = await sendEmail(emailMessage);
+                if (voiceReplies) speech.speak(result);
+              }}
+              onDiscard={() => chat.updateMessage(emailMessage.id, { emailStatus: 'discarded' })}
+              onClose={() => closePanel('email')}
+            />
+          )}
+          {ownerLink && <LinkPanel key={latestReply?.id} link={ownerLink} onClose={() => closePanel('link')} />}
           {personProfile && <PersonPanel profile={personProfile} onClose={() => closePanel('person')} />}
           {weatherReport && <WeatherPanel report={weatherReport} onClose={() => closePanel('weather')} />}
           {newsReport && <NewsPanel report={newsReport} onClose={() => closePanel('news')} />}
@@ -473,6 +644,10 @@ export default function App({ account, onSignOut }: AppProps) {
             key={chat.conversationId}
             onSend={handleSend}
             isLoading={chat.isLoading}
+            onStopReply={() => {
+              chat.stop();
+              stopSpeaking();
+            }}
             isSpeaking={speech.isSpeaking}
             onStopSpeaking={stopSpeaking}
             onVoiceError={setVoiceError}

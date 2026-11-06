@@ -11,13 +11,15 @@ import {
 import { MAX_MESSAGE_LENGTH } from '../hooks/useChat';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
 import { canCaptureScreen, captureScreen, prepareImage, type AttachedImage } from '../media/image';
-import { CloseIcon, ImageIcon, MicIcon, MonitorIcon, SendIcon, StopIcon } from './icons';
+import { CloseIcon, HaltIcon, ImageIcon, MicIcon, MonitorIcon, SendIcon, StopIcon } from './icons';
 
 const MAX_INPUT_HEIGHT = 160;
 
 interface ChatInputProps {
   onSend: (text: string, image?: AttachedImage) => Promise<boolean>;
   isLoading: boolean;
+  /** Stops the reply currently being written. */
+  onStopReply: () => void;
   isSpeaking: boolean;
   onStopSpeaking: () => void;
   onVoiceError: (message: string) => void;
@@ -32,6 +34,7 @@ const joinText = (base: string, addition: string) => (base.trim() ? `${base.trim
 export function ChatInput({
   onSend,
   isLoading,
+  onStopReply,
   isSpeaking,
   onStopSpeaking,
   onVoiceError,
@@ -241,9 +244,21 @@ export function ChatInput({
         >
           <MicIcon />
         </button>
-        <button type="submit" className="icon-btn icon-btn--primary" disabled={!canSend} aria-label="Send message" title="Send">
-          <SendIcon />
-        </button>
+        {isLoading ? (
+          <button
+            type="button"
+            className="icon-btn icon-btn--primary icon-btn--halt"
+            onClick={onStopReply}
+            aria-label="Stop the reply"
+            title="Stop the reply"
+          >
+            <HaltIcon />
+          </button>
+        ) : (
+          <button type="submit" className="icon-btn icon-btn--primary" disabled={!canSend} aria-label="Send message" title="Send">
+            <SendIcon />
+          </button>
+        )}
       </div>
       <p className="composer__hint" aria-live="polite">
         {speech.isListening

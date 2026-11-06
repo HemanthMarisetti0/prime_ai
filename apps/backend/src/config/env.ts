@@ -9,7 +9,13 @@ export interface AppEnv {
   port: number;
   corsOrigins: string[];
   /** `model` is preferred; `fallbackModels` are tried in order when it hits a limit or is unavailable. */
-  gemini: { apiKey: string; model: string; fallbackModels: string[] };
+  gemini: {
+    apiKey: string;
+    model: string;
+    fallbackModels: string[];
+    /** Keep model "thinking" minimal for faster replies (GEMINI_FAST_THINKING=false restores model defaults). */
+    fastThinking: boolean;
+  };
   systemMonitor: boolean;
   /** Control of the host PC (currently: Windows system volume). */
   pcControl: boolean;
@@ -69,6 +75,7 @@ export function loadEnv(source: NodeJS.ProcessEnv = process.env): AppEnv {
           : list(source.GEMINI_FALLBACK_MODELS).length
             ? list(source.GEMINI_FALLBACK_MODELS)
             : DEFAULT_FALLBACK_MODELS,
+      fastThinking: flag(source.GEMINI_FAST_THINKING, true),
     },
     // A cloud server would report its own hardware, so telemetry defaults off in production.
     systemMonitor: flag(source.SYSTEM_MONITOR, !isProduction),

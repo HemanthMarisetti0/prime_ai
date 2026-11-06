@@ -7,13 +7,28 @@ import {
   Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { ApiError, GoogleGenAI, type Content, type FunctionCall, type FunctionDeclaration } from '@google/genai';
+import {
+  ApiError,
+  FunctionCallingConfigMode,
+  GoogleGenAI,
+  ThinkingLevel,
+  type Content,
+  type FunctionCall,
+  type FunctionDeclaration,
+  type GenerateContentConfig,
+  type Part,
+  type ThinkingConfig,
+} from '@google/genai';
 import type {
   ChatImage,
   ChatMessage,
   ChatResponse,
+  ChatStreamEvent,
   MediaState,
   DirectionsResult,
+  EmailDraft,
+  OwnerLink,
+  OwnerSite,
   NewsReport,
   PcAppId,
   PersonProfile,
@@ -23,6 +38,7 @@ import type {
   TravelMode,
   TripPlan,
   UserLocation,
+  UserProfile,
   WeatherReport,
   YouTubeResults,
 } from '@prime/shared';
@@ -38,14 +54,19 @@ import { CurrencyService } from '../tools/currency.service';
 import { DirectionsService } from '../tools/directions.service';
 import { GeoService } from '../tools/geo.service';
 import { NewsService } from '../tools/news.service';
+import { CONTACTS, OWNER_LINKS, OwnerProfileService } from '../tools/owner-profile.service';
 import { PersonService } from '../tools/person.service';
 import { WeatherService } from '../tools/weather.service';
 import { YouTubeService } from '../tools/youtube.service';
-import { classifyModelError, ModelPool } from './model-pool';
+import { classifyModelError, ModelPool, type FallbackReason } from './model-pool';
 import { buildSystemInstruction, SYSTEM_DISPLAY_TAG } from './prime.persona';
 
-const REQUEST_TIMEOUT_MS = 45_000;
-const RETRY_DELAY_MS = 1500;
+const REQUEST_TIMEOUT_MS = 30_000;
+// Only used when no other model is left to switch to.
+const RETRY_DELAY_MS = 800;
+// Telemetry younger than this is reused as is; older readings refresh in the background.
+const TELEMETRY_FRESH_MS = 15_000;
+const TELEMETRY_FIRST_WAIT_MS = 1200;
 // Upper bound on model <-> tool round trips per message.
 const MAX_TOOL_ROUNDS = 4;
 
@@ -100,6 +121,77 @@ const TOOLS: FunctionDeclaration[] = [
     },
   },
 ];
+
+const OWNER_SITES = Object.keys(OWNER_LINKS) as OwnerSite[];
+
+const OPEN_PROFILE_TOOL: FunctionDeclaration = {
+  name: 'open_my_profile',
+  description:
+    "Open one of Sir's own pages: his portfolio website, GitHub or LinkedIn. Omit 'where' unless Sir said where; the display then offers both choices.",
+  parametersJsonSchema: {
+    type: 'object',
+    properties: {
+      site: { type: 'string', enum: OWNER_SITES },
+      where: {
+        type: 'string',
+        enum: ['inside', 'new_tab'],
+        description: '"inside" shows it within P.R.I.M.E. (portfolio only); "new_tab" opens a browser tab.',
+      },
+    },
+    required: ['site'],
+  },
+};
+
+const EMAIL_TOOL: FunctionDeclaration = {
+  name: 'compose_email',
+  description:
+    "Draft an email for Sir to review. It appears on his display and is sent from his Gmail only after he confirms. Only call it once you know the recipient(s) and what the email should say. Recipients can be contacts by name (e.g. 'wife', 'me') or email addresses.",
+  parametersJsonSchema: {
+    type: 'object',
+    properties: {
+      to: { type: 'array', items: { type: 'string' }, description: "Contact names ('me', 'wife', 'Neeraja') or email addresses." },
+      subject: { type: 'string' },
+      body: { type: 'string', description: 'The full email text, signed off with Sir\'s name unless he asks otherwise.' },
+    },
+    required: ['to', 'subject', 'body'],
+  },
+};
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// "Email my wife ...", "send a mail to x@y.com", "write an email to Neeraja": unmistakable requests to draft
+// an email (questions such as "what is my wife's email?" don't match).
+const EMAIL_REQUEST =
+  /^(?:(?:please|prime|hey|ok|okay|can you|could you|would you|kindly)[\s,]+)*(?:e-?mail|mail)\s+(?:me|my|to|him|her|them|\S+@)|\b(?:send|write|draft|compose|drop|shoot)\b[^.?!]{0,40}\b(?:e-?mail|mail)\b/i;
+
+/** The tool a message unmistakably asks for, which the model must then call. */
+// Words showing the request already says what to write ("email my wife THAT ...", "... ABOUT the meeting").
+const EMAIL_CONTENT = /\b(that|saying|say|says|about|regarding|to tell|telling|asking|to ask|to let|letting|wish|wishing|inviting|thanking|reminding|with)\b|:/i;
+
+/** The tool a message unmistakably asks for, which the model must then call. */
+function forcedTool(message: string): string | null {
+  // Only when it is clear what to write; otherwise the model should first ask Sir.
+  const text = message.trim();
+  return EMAIL_REQUEST.test(text) && EMAIL_CONTENT.test(text) ? 'compose_email' : null;
+}
+
+/** Turns "wife", "me", "Neeraja" or an address into a recipient; null when unknown. */
+function resolveRecipient(value: string): { name?: string; email: string } | null {
+  const wanted = value.trim().toLowerCase();
+  if (EMAIL_PATTERN.test(wanted)) {
+    const contact = CONTACTS.find((c) => c.email === wanted);
+    return { email: wanted, ...(contact && { name: contact.name }) };
+  }
+  const contact = CONTACTS.find(
+    (c) => c.name.toLowerCase().includes(wanted) || c.aliases.some((alias) => alias === wanted || wanted.endsWith(` ${alias}`)),
+  );
+  return contact ? { name: contact.name, email: contact.email } : null;
+}
+
+function gmailComposeUrl(to: string[], subject: string, body: string): string {
+  const params = new URLSearchParams({ view: 'cm', fs: '1', to: to.join(','), su: subject, body });
+  return `https://mail.google.com/mail/?${params}`;
+}
 
 const TRAVEL_TOOLS: FunctionDeclaration[] = [
   {
@@ -277,6 +369,92 @@ interface ToolResults {
   directions?: DirectionsResult;
   trip?: TripPlan;
   person?: PersonProfile;
+  link?: OwnerLink;
+  email?: EmailDraft;
+}
+
+/** What the HUD shows while a tool runs. */
+const TOOL_STATUS: Record<string, string> = {
+  get_weather: 'Checking the weather',
+  get_news: 'Gathering the latest headlines',
+  lookup_person: 'Looking them up',
+  search_youtube: 'Searching YouTube',
+  find_places: 'Searching the map',
+  get_directions: 'Plotting a route',
+  convert_currency: 'Fetching exchange rates',
+  show_trip_plan: 'Drafting your itinerary',
+  open_app: 'Opening the application',
+  set_brightness: 'Adjusting the display',
+  power_action: 'Contacting your computer',
+  set_system_volume: 'Adjusting the volume',
+  open_my_profile: 'Opening your page',
+  compose_email: 'Drafting your email',
+};
+
+export interface ChatStreamOptions {
+  /** Receives the reply text, tool status and panel data as they become available. */
+  onEvent?: (event: ChatStreamEvent) => void;
+  /** Cancels the request (e.g. Sir pressed stop or closed the page). */
+  signal?: AbortSignal;
+}
+
+interface StreamedTurn {
+  parts: Part[];
+  calls: FunctionCall[];
+  text: string;
+}
+
+const NETWORK_BLIP = { reason: 'unreachable' as FallbackReason, restSeconds: 10 };
+
+/** A dropped connection or similar network failure, worth another attempt. */
+function isNetworkBlip(error: unknown): boolean {
+  return error instanceof TypeError && /fetch failed|network|socket|ECONNRESET/i.test(error.message);
+}
+
+/** A model that doesn't accept our thinking setting (falls back to its own default). */
+function isThinkingConfigRejected(error: unknown): boolean {
+  return error instanceof ApiError && error.status === 400 && /thinking/i.test(error.message ?? '');
+}
+
+/**
+ * Keep "thinking" to a minimum: for a short spoken assistant it mostly adds seconds of silence.
+ * Gemini 2.5 Flash thinks by default (often 5-10 s); Gemini 3 models take a level instead of a budget.
+ */
+export function fastThinking(model: string): ThinkingConfig | undefined {
+  if (!env.gemini.fastThinking) return undefined;
+  if (/^gemini-2\.5-flash/.test(model)) return { thinkingBudget: 0 };
+  if (/^gemini-3/.test(model)) return { thinkingLevel: /flash/.test(model) ? ThinkingLevel.MINIMAL : ThinkingLevel.LOW };
+  return undefined;
+}
+
+const TAG_PREFIXES = Array.from({ length: SYSTEM_DISPLAY_TAG.length - 1 }, (_, i) => SYSTEM_DISPLAY_TAG.slice(0, i + 1)).reverse();
+
+/**
+ * Turns the growing raw reply into clean `delta` events: the display tag is removed, and a
+ * trailing fragment that might be the start of the tag is held back until it is complete.
+ */
+class ReplyEmitter {
+  private sent = '';
+
+  constructor(private readonly emit: (event: ChatStreamEvent) => void) {}
+
+  update(raw: string) {
+    let clean = raw.replace(DISPLAY_TAG_PATTERN, ' ').trimStart();
+    const partial = TAG_PREFIXES.find((prefix) => clean.endsWith(prefix));
+    if (partial) clean = clean.slice(0, -partial.length);
+    if (clean.length <= this.sent.length) return;
+    if (!clean.startsWith(this.sent)) {
+      this.emit({ type: 'reset' });
+      this.sent = '';
+    }
+    this.emit({ type: 'delta', text: clean.slice(this.sent.length) });
+    this.sent = clean;
+  }
+
+  reset() {
+    if (this.sent) this.emit({ type: 'reset' });
+    this.sent = '';
+  }
 }
 
 /** Per-request context from Sir's browser. */
@@ -284,6 +462,7 @@ export interface ChatContext {
   location?: UserLocation;
   media?: MediaState;
   image?: ChatImage;
+  profile?: UserProfile;
 }
 
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -295,6 +474,10 @@ export class AiService {
   private readonly pool = new ModelPool([env.gemini.model, ...env.gemini.fallbackModels]);
   private readonly client: GoogleGenAI | null;
   private readonly tools: FunctionDeclaration[];
+  /** Models that rejected our thinking setting; they use their own default. */
+  private readonly plainThinkingModels = new Set<string>();
+  private telemetry: { at: number; text: string } | null = null;
+  private telemetryRefresh: Promise<string | null> | null = null;
 
   constructor(
     private readonly systemService: SystemService,
@@ -307,8 +490,9 @@ export class AiService {
     private readonly currencyService: CurrencyService,
     private readonly pcService: PcService,
     private readonly personService: PersonService,
+    private readonly ownerProfile: OwnerProfileService,
   ) {
-    this.tools = [...TOOLS, ...TRAVEL_TOOLS, ...(volumeService.enabled ? [SYSTEM_VOLUME_TOOL, ...PC_TOOLS] : [])];
+    this.tools = [...TOOLS, OPEN_PROFILE_TOOL, EMAIL_TOOL, ...TRAVEL_TOOLS, ...(volumeService.enabled ? [SYSTEM_VOLUME_TOOL, ...PC_TOOLS] : [])];
     const { apiKey } = env.gemini;
     if (!apiKey) {
       this.logger.warn('GEMINI_API_KEY is not set; /api/chat will return 503.');
@@ -319,15 +503,33 @@ export class AiService {
     this.logger.log(`Gemini models (in order of preference): ${this.pool.models.join(', ')}`);
   }
 
-  async chat(message: string, history: ChatMessage[], context: ChatContext = {}): Promise<ChatResponse> {
+  /**
+   * Answers one message. Text is generated as a stream: `onEvent` (optional) receives the reply
+   * as it is written, tool status updates and panel data, so the HUD can show progress at once.
+   */
+  async chat(
+    message: string,
+    history: ChatMessage[],
+    context: ChatContext = {},
+    { onEvent, signal }: ChatStreamOptions = {},
+  ): Promise<ChatResponse> {
     if (!this.client) {
       throw new ServiceUnavailableException('My apologies, Sir. My AI link has not been configured yet.');
     }
 
+    const emit = onEvent ?? (() => {});
+    const text = new ReplyEmitter(emit);
     const telemetry = await this.getTelemetry();
     const config = {
-      systemInstruction: buildSystemInstruction(telemetry, context.media, this.volumeService.enabled),
+      systemInstruction: buildSystemInstruction(
+        telemetry,
+        context.media,
+        this.volumeService.enabled,
+        context.profile,
+        this.ownerProfile.background(),
+      ),
       tools: [{ functionDeclarations: this.tools }],
+      ...(signal && { abortSignal: signal }),
     };
     const contents = toGeminiContents(message, history, context.image);
     const results: ToolResults = {};
@@ -340,37 +542,65 @@ export class AiService {
     try {
       let raw = '';
       for (let round = 0; ; round++) {
-        let response;
+        let turn: StreamedTurn;
+        let retriedSameModel = false;
         for (;;) {
           try {
-            response = await this.generateWithRetry({ model, contents, config });
+            // A clear request for an action must use its tool first (small models sometimes just claim it).
+            const forced = round === 0 ? forcedTool(message) : null;
+            const turnConfig: GenerateContentConfig = forced
+              ? { ...config, toolConfig: { functionCallingConfig: { mode: FunctionCallingConfigMode.ANY, allowedFunctionNames: [forced] } } }
+              : config;
+            turn = await this.streamTurn(model, contents, turnConfig, text);
             break;
           } catch (error) {
-            const verdict = classifyModelError(error);
+            if (signal?.aborted) throw error;
+            text.reset();
+            if (isThinkingConfigRejected(error) && !this.plainThinkingModels.has(model)) {
+              this.logger.warn(`${model} rejected the thinking setting; using its default from now on`);
+              this.plainThinkingModels.add(model);
+              continue;
+            }
+            const verdict = classifyModelError(error) ?? (isNetworkBlip(error) ? NETWORK_BLIP : null);
             if (!verdict) throw error;
-            this.pool.rest(model, verdict.restSeconds);
             const next = candidates.shift();
-            if (!next) throw this.pool.available().length ? error : this.allModelsResting();
+            if (!next) {
+              // Last option: one quick retry of the same model for a passing hiccup.
+              if (verdict.reason !== 'quota exhausted' && verdict.reason !== 'unavailable' && !retriedSameModel) {
+                retriedSameModel = true;
+                this.logger.warn(`${model} ${verdict.reason}; retrying once`);
+                await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
+                continue;
+              }
+              this.pool.rest(model, verdict.restSeconds);
+              throw this.pool.available().length ? error : this.allModelsResting();
+            }
+            // Switch straight away rather than waiting on a struggling model.
+            this.pool.rest(model, verdict.restSeconds);
             this.logger.warn(`${model} ${verdict.reason}; switching to ${next}`);
             // A different model can't validate the previous model's thought signatures.
             if (round > 0) neutraliseThoughtSignatures(contents);
             model = next;
           }
         }
-        const calls = response.functionCalls ?? [];
-        if (!calls.length || round === MAX_TOOL_ROUNDS) {
-          raw = response.text?.trim() ?? '';
+        if (!turn.calls.length || round === MAX_TOOL_ROUNDS) {
+          raw = turn.text.trim();
           break;
         }
+        // Text written before a tool call is a preamble, not the answer.
+        text.reset();
         // Keep the model's turn verbatim (it carries thought signatures), then answer each call.
-        const modelTurn = response.candidates?.[0]?.content;
-        if (modelTurn) contents.push(modelTurn);
+        contents.push({ role: 'model', parts: turn.parts });
+        const status = TOOL_STATUS[turn.calls[0].name ?? ''];
+        if (status) emit({ type: 'status', text: status });
         const parts = await Promise.all(
-          calls.map(async (call) => ({
+          turn.calls.map(async (call) => ({
             functionResponse: { id: call.id, name: call.name, response: await this.runTool(call, context, results) },
           })),
         );
+        if (Object.keys(results).length) emit({ type: 'extras', extras: { ...results } });
         contents.push({ role: 'user', parts });
+        emit({ type: 'status', text: 'Composing a reply' });
       }
 
       const tagged = raw.includes(SYSTEM_DISPLAY_TAG);
@@ -382,8 +612,38 @@ export class AiService {
       const showSystem = Boolean(telemetry) && (tagged || SYSTEM_QUESTION.test(message));
       return { reply, model, ...(showSystem && { display: 'system' as const }), ...results };
     } catch (error) {
+      // Cancelled by Sir: nothing went wrong, so there is nothing to report.
+      if (signal?.aborted) throw error;
       throw this.toHttpException(error);
     }
+  }
+
+  /** Streams one model turn, forwarding its text as it arrives. */
+  private async streamTurn(
+    model: string,
+    contents: Content[],
+    config: GenerateContentConfig,
+    text: ReplyEmitter,
+  ): Promise<StreamedTurn> {
+    const thinkingConfig = this.plainThinkingModels.has(model) ? undefined : fastThinking(model);
+    const stream = await this.client!.models.generateContentStream({
+      model,
+      contents,
+      config: { ...config, ...(thinkingConfig && { thinkingConfig }) },
+    });
+    const parts: Part[] = [];
+    let written = '';
+    for await (const chunk of stream) {
+      for (const part of chunk.candidates?.[0]?.content?.parts ?? []) {
+        parts.push(part);
+        if (part.text && !part.thought) {
+          written += part.text;
+          text.update(written);
+        }
+      }
+    }
+    const calls = parts.flatMap((part) => (part.functionCall ? [part.functionCall] : []));
+    return { parts, calls, text: written };
   }
 
   /** Every model is resting after hitting its limits. */
@@ -401,21 +661,6 @@ export class AiService {
       `My apologies, Sir. All of my free AI models have reached their limits for now. Kindly try again ${wait}.`,
       HttpStatus.TOO_MANY_REQUESTS,
     );
-  }
-
-  /** One retry for transient Gemini failures (overloaded, deadline exceeded, dropped connection). */
-  private async generateWithRetry(params: Parameters<GoogleGenAI['models']['generateContent']>[0]) {
-    try {
-      return await this.client!.models.generateContent(params);
-    } catch (error) {
-      const transient =
-        (error instanceof ApiError && [500, 503, 504].includes(error.status)) ||
-        (error instanceof TypeError && /fetch failed/i.test(error.message));
-      if (!transient) throw error;
-      this.logger.warn(`Transient Gemini error (${error instanceof ApiError ? error.status : error.message}); retrying once`);
-      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
-      return this.client!.models.generateContent(params);
-    }
   }
 
   /** Executes one tool call; failures are reported back to the model so it can apologise gracefully. */
@@ -517,6 +762,52 @@ export class AiService {
             },
           };
         }
+        case 'compose_email': {
+          const names = Array.isArray(args.to) ? args.to.filter((v): v is string => typeof v === 'string') : [];
+          const subject = text(args.subject)?.trim() ?? '';
+          // Models occasionally write line breaks as a literal "\n"; turn them into real ones.
+          const rawBody = text(args.body)?.trim() ?? '';
+          const body = !rawBody.includes('\n') && rawBody.includes('\\n') ? rawBody.replace(/(?:\\r)?\\n/g, '\n') : rawBody;
+          if (!names.length) return { error: 'Ask Sir who the email is for.' };
+          if (!body) return { error: 'The email needs some text.' };
+          const recipients = names.map((name) => ({ name, recipient: resolveRecipient(name) }));
+          const unknown = recipients.filter((r) => !r.recipient).map((r) => r.name);
+          if (unknown.length) {
+            return { error: `No email address is known for ${unknown.join(', ')}. Ask Sir for the address.` };
+          }
+          const to = recipients.map((r) => r.recipient!);
+          results.email = { to, subject, body, gmailUrl: gmailComposeUrl(to.map((r) => r.email), subject, body) };
+          return {
+            output: {
+              to: to.map((r) => (r.name ? `${r.name} <${r.email}>` : r.email)),
+              subject,
+              status: "Drafted and shown on Sir's display. NOT sent: ask Sir to confirm. His 'yes, send it' or the Send button sends it.",
+            },
+          };
+        }
+        case 'open_my_profile': {
+          const site = text(args.site) as OwnerSite | undefined;
+          const page = site && OWNER_LINKS[site];
+          if (!site || !page?.url) return { error: 'That page is not configured.' };
+          const asked = args.where === 'inside' || args.where === 'new_tab' ? args.where : null;
+          // GitHub and LinkedIn refuse to be shown inside other sites, so they always get a tab.
+          const open = page.embeddable ? asked : 'new_tab';
+          results.link = { site, ...page, open };
+          return {
+            output: {
+              page: page.label,
+              url: page.url,
+              status:
+                open === null
+                  ? "Both choices are on Sir's display. Ask whether to open it here or in a new tab."
+                  : open === 'inside'
+                    ? 'Shown inside the display.'
+                    : asked === 'inside'
+                      ? `${page.label} does not allow being shown inside other sites, so it is opening in a new tab instead.`
+                      : 'Opening in a new tab.',
+            },
+          };
+        }
         case 'lookup_person': {
           const name = text(args.name)?.trim();
           if (!name) return { error: 'A name is required.' };
@@ -541,14 +832,33 @@ export class AiService {
     }
   }
 
+  /**
+   * Telemetry for the model's context, without making Sir wait for hardware probes:
+   * a recent reading is reused, a stale one is refreshed in the background.
+   */
   private async getTelemetry(): Promise<string | null> {
     if (!this.systemService.enabled) return null;
-    try {
-      return describeSnapshot(await this.systemService.getSnapshot());
-    } catch (error) {
-      this.logger.warn(`Telemetry unavailable: ${error instanceof Error ? error.message : String(error)}`);
-      return null;
-    }
+    const cached = this.telemetry;
+    if (cached && Date.now() - cached.at < TELEMETRY_FRESH_MS) return cached.text;
+
+    this.telemetryRefresh ??= this.systemService
+      .getSnapshot()
+      .then((snapshot) => {
+        this.telemetry = { at: Date.now(), text: describeSnapshot(snapshot) };
+        return this.telemetry.text;
+      })
+      .catch((error: unknown) => {
+        this.logger.warn(`Telemetry unavailable: ${error instanceof Error ? error.message : String(error)}`);
+        return null;
+      })
+      .finally(() => (this.telemetryRefresh = null));
+
+    if (cached) return cached.text;
+    // First reading: wait briefly, but never hold the conversation up for long.
+    return Promise.race([
+      this.telemetryRefresh,
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), TELEMETRY_FIRST_WAIT_MS)),
+    ]);
   }
 
   private toHttpException(error: unknown): HttpException {
