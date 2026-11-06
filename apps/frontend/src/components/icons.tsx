@@ -126,3 +126,23 @@ export const TrashIcon = () => (
     <path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6" />
   </Icon>
 );
+
+export const CopyIcon = () => (
+  <Icon width="14" height="14">
+    <rect x="9" y="9" width="12" height="12" rx="1" />
+    <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" />
+  </Icon>
+);
+
+export const CheckIcon = () => (
+  <Icon width="14" height="14">
+    <path d="M20 6 9 17l-5-5" />
+  </Icon>
+);
+
+/** Filled square: stop the reply being generated. */
+export const HaltIcon = () => (
+  <Icon>
+    <rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor" stroke="none" />
+  </Icon>
+);

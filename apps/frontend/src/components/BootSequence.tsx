@@ -42,7 +42,9 @@ export function BootSequence({
   const link: Check['result'] =
     serverStatus === 'online'
       ? { text: 'Established', tone: 'ok' }
-      : serverStatus === 'offline' || linkTimedOut
+      : serverStatus === 'waking'
+        ? { text: 'Waking server', tone: 'warn' }
+        : serverStatus === 'offline' || linkTimedOut
         ? { text: 'Offline', tone: 'fail' }
         : null;
 

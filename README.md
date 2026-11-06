@@ -88,6 +88,7 @@ Each app has one settings file per environment. Real files are git-ignored; copy
 | `GEMINI_API_KEY` | prod | | Gemini API key (secret) |
 | `GEMINI_MODEL` | | `gemini-2.5-flash` | Preferred Gemini model |
 | `GEMINI_FALLBACK_MODELS` | | built-in list | Comma-separated models tried in order when one hits its limit or is unavailable; `none` disables fallback |
+| `GEMINI_FAST_THINKING` | | `true` | Keeps model "thinking" minimal for much faster replies; `false` restores each model's default |
 | `PORT` | | `3000` | HTTP port |
 | `FIREBASE_PROJECT_ID` | prod | | Enables sign-in; empty disables it (development only) |
 | `ALLOWED_EMAILS` | prod | | Comma-separated Google accounts allowed in |

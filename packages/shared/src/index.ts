@@ -29,6 +29,12 @@ export interface ChatImage {
   data: string;
 }
 
+/** What Sir has told P.R.I.M.E. about himself (Settings → About you), plus his account name. */
+export interface UserProfile {
+  name?: string;
+  about?: string;
+}
+
 export interface ChatRequest {
   message: string;
   history: ChatMessage[];
@@ -36,6 +42,7 @@ export interface ChatRequest {
   location?: UserLocation;
   media?: MediaState;
   image?: ChatImage;
+  profile?: UserProfile;
 }
 
 export interface YouTubeVideo {
@@ -153,6 +160,27 @@ export interface PersonProfile {
 /** Extra HUD panels the frontend should show alongside a reply. */
 export type ChatDisplay = 'system';
 
+export type OwnerSite = 'portfolio' | 'github' | 'linkedin';
+
+/** One of Sir's own pages to open: inside the HUD, in a new tab, or (null) ask him which. */
+export interface OwnerLink {
+  site: OwnerSite;
+  label: string;
+  url: string;
+  /** The site allows being shown inside another page (GitHub and LinkedIn forbid it). */
+  embeddable: boolean;
+  open: 'inside' | 'new_tab' | null;
+}
+
+/** An email P.R.I.M.E. drafted; Sir sends it from his own Gmail with one click. */
+export interface EmailDraft {
+  to: { name?: string; email: string }[];
+  subject: string;
+  body: string;
+  /** Opens Gmail's compose window with everything filled in. */
+  gmailUrl: string;
+}
+
 export interface ChatResponse {
   reply: string;
   /** Gemini model that produced the reply (may be a fallback). */
@@ -165,7 +193,29 @@ export interface ChatResponse {
   directions?: DirectionsResult;
   trip?: TripPlan;
   person?: PersonProfile;
+  link?: OwnerLink;
+  email?: EmailDraft;
 }
+
+/** Extra data a reply carries for the HUD panels (everything in ChatResponse except the text). */
+export type ChatExtras = Omit<ChatResponse, 'reply'>;
+
+/**
+ * One line of the newline-delimited JSON stream from POST /api/chat/stream.
+ * - status: what P.R.I.M.E. is doing right now (e.g. "Checking the weather").
+ * - delta: the next piece of reply text.
+ * - reset: discard the text so far (the model changed course or a fallback model took over).
+ * - extras: panel data, sent as soon as a tool finishes, before the text is complete.
+ * - done: the final, authoritative reply.
+ * - error: the request failed after streaming had started.
+ */
+export type ChatStreamEvent =
+  | { type: 'status'; text: string }
+  | { type: 'delta'; text: string }
+  | { type: 'reset' }
+  | { type: 'extras'; extras: ChatExtras }
+  | { type: 'done'; response: ChatResponse }
+  | { type: 'error'; status: number; message: string };
 
 export interface HealthResponse {
   status: 'ok';
@@ -218,3 +268,4 @@ export interface ApiErrorResponse {
   message: string | string[];
   error?: string;
 }
+

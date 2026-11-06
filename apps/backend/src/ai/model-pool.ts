@@ -1,6 +1,6 @@
 import { ApiError } from '@google/genai';
 
-export type FallbackReason = 'quota exhausted' | 'unavailable' | 'overloaded';
+export type FallbackReason = 'quota exhausted' | 'unavailable' | 'overloaded' | 'unreachable';
 
 const MINUTE_QUOTA_REST_S = 60;
 const DAILY_QUOTA_REST_S = 60 * 60;
